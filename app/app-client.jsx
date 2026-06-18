@@ -54,88 +54,16 @@ export default function App() {
     async function hydrateCache() {
       setLoadingData(true);
       try {
-        // Fetch profiles first to see if we need to seed
-        const { data: userProfiles, error: profError } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('added_at', { ascending: false });
+        const [profilesRes, signalsRes] = await Promise.all([
+          supabase.from('profiles').select('*').order('added_at', { ascending: false }),
+          supabase.from('signals').select('*').order('detected_at', { ascending: false })
+        ]);
 
-        if (profError) throw profError;
+        if (profilesRes.error) throw profilesRes.error;
+        if (signalsRes.error) throw signalsRes.error;
 
-        if (userProfiles && userProfiles.length === 0) {
-          console.log("Empty profile table detected. Seeding with default REAL profiles and signals...");
-
-          // Seed default profiles associated with user_id
-          const { error: seedProfError } = await supabase
-            .from('profiles')
-            .insert(
-              REAL_PROFILES.map(p => ({
-                id: p.id,
-                name: p.name,
-                linkedin_url: p.linkedinUrl,
-                company: p.company,
-                company_linkedin_url: p.companyLinkedinUrl || '',
-                title: p.title || '',
-                email: p.email || '',
-                notes: p.notes || '',
-                status: p.status,
-                last_polled: p.lastPolled,
-                added_at: p.addedAt,
-                snapshots: p.snapshots || [],
-                user_id: session.user.id
-              }))
-            );
-          if (seedProfError) throw seedProfError;
-
-          // Seed default signals associated with user_id
-          const { error: seedSigError } = await supabase
-            .from('signals')
-            .insert(
-              REAL_SIGNALS.map(s => ({
-                id: s.id,
-                type: s.type,
-                priority: s.priority,
-                label: s.label,
-                emoji: s.emoji || '',
-                why: s.why,
-                action: s.action || '',
-                credits: s.credits || 1,
-                profile: s.profile || '',
-                company: s.company || '',
-                linkedin_url: s.linkedinUrl || '',
-                profile_linkedin_url: s.profileLinkedinUrl || '',
-                post_url: s.postUrl || '',
-                detected_at: s.detectedAt,
-                evidence: s.evidence || '',
-                dismissed: s.dismissed || false,
-                user_id: session.user.id
-              }))
-            );
-          if (seedSigError) throw seedSigError;
-
-          // Re-fetch now that seeding is done
-          const [freshProfiles, freshSignals] = await Promise.all([
-            supabase.from('profiles').select('*').order('added_at', { ascending: false }),
-            supabase.from('signals').select('*').order('detected_at', { ascending: false })
-          ]);
-
-          if (freshProfiles.error) throw freshProfiles.error;
-          if (freshSignals.error) throw freshSignals.error;
-
-          setProfiles(freshProfiles.data || []);
-          setSignals(freshSignals.data || []);
-        } else {
-          // Normal hydration (already seeded)
-          const { data: userSignals, error: sigError } = await supabase
-            .from('signals')
-            .select('*')
-            .order('detected_at', { ascending: false });
-
-          if (sigError) throw sigError;
-
-          setProfiles(userProfiles || []);
-          setSignals(userSignals || []);
-        }
+        setProfiles(profilesRes.data || []);
+        setSignals(signalsRes.data || []);
       } catch (err) {
         console.error("Error hydrating Supabase data cache:", err.message);
         showToast("⚠️ Error loading database cache");
