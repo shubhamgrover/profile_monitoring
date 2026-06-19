@@ -43,6 +43,22 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const mapProfile = (p) => ({
+    ...p,
+    linkedinUrl: p.linkedinUrl || p.linkedin_url,
+    companyLinkedinUrl: p.companyLinkedinUrl || p.company_linkedin_url,
+    lastPolled: p.lastPolled || p.last_polled,
+    addedAt: p.addedAt || p.added_at,
+  });
+
+  const mapSignal = (s) => ({
+    ...s,
+    linkedinUrl: s.linkedinUrl || s.linkedin_url,
+    profileLinkedinUrl: s.profileLinkedinUrl || s.profile_linkedin_url,
+    postUrl: s.postUrl || s.post_url,
+    detectedAt: s.detectedAt || s.detected_at,
+  });
+
   // Fetch data or seed default profiles if project tables are empty
   useEffect(() => {
     if (!session) {
@@ -62,8 +78,8 @@ export default function App() {
         if (profilesRes.error) throw profilesRes.error;
         if (signalsRes.error) throw signalsRes.error;
 
-        setProfiles(profilesRes.data || []);
-        setSignals(signalsRes.data || []);
+        setProfiles((profilesRes.data || []).map(mapProfile));
+        setSignals((signalsRes.data || []).map(mapSignal));
       } catch (err) {
         console.error("Error hydrating Supabase data cache:", err.message);
         showToast("⚠️ Error loading database cache");
@@ -86,8 +102,8 @@ export default function App() {
       if (profilesRes.error) throw profilesRes.error;
       if (signalsRes.error) throw signalsRes.error;
 
-      setProfiles(profilesRes.data || []);
-      setSignals(signalsRes.data || []);
+      setProfiles((profilesRes.data || []).map(mapProfile));
+      setSignals((signalsRes.data || []).map(mapSignal));
     } catch (err) {
       console.error("Error refreshing Supabase state:", err);
     }
