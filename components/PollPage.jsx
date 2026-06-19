@@ -66,61 +66,25 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
       const snapshot = {
         ...prev,
         currentCompany: profile.company || profile.name,
-        currentTitle: profile.title || 'Company Page',
+        currentTitle: profile.title || (isComp ? 'Company Page' : 'Executive'),
         polledAt: new Date().toISOString(),
-        posts: prev.posts || []
       };
 
-      // In demo mode, seed mock posts for known companies to populate the dossier tabs
-      const lowerName = profile.name.toLowerCase();
-      if (!snapshot.posts || snapshot.posts.length === 0) {
-        if (lowerName.includes('dentsu x')) {
-          snapshot.posts = [
-            {
-              text: "Dentsu X India is thrilled to secure the integrated media mandate for a leading EV automotive brand! Looking forward to driving scale and performance marketing across APAC.",
-              link: "https://www.linkedin.com/company/dentsu-x",
-              date: new Date(Date.now() - 86400000 * 2).toISOString(),
-              likesCount: 320,
-              commentsCount: 24
-            },
-            {
-              text: "Context-based targeting is crucial for modern media plans. Here's how we helped our retail partners optimize cross-channel campaigns this quarter.",
-              link: "https://www.linkedin.com/company/dentsu-x",
-              date: new Date(Date.now() - 86400000 * 4).toISOString(),
-              likesCount: 145,
-              commentsCount: 9
-            }
-          ];
-        } else if (lowerName.includes('dentsu')) {
-          snapshot.posts = [
-            {
-              text: "Dentsu launches Zoyumi, our proprietary AI-driven content production and media planning platform across APAC! Reach out to learn more about how we scale creative campaigns.",
-              link: "https://www.linkedin.com/company/dentsu",
-              date: new Date(Date.now() - 86400000 * 2).toISOString(),
-              likesCount: 540,
-              commentsCount: 38
-            }
-          ];
-        } else if (lowerName.includes('carat')) {
-          snapshot.posts = [
-            {
-              text: "Carat Media secures the digital media planning mandate for APAC! We are excited to partner with leading brands to drive digital transformation.",
-              link: "https://www.linkedin.com/company/carat",
-              date: new Date(Date.now() - 86400000 * 2).toISOString(),
-              likesCount: 145,
-              commentsCount: 12
-            }
-          ];
-        } else if (lowerName.includes('atlys')) {
-          snapshot.posts = [
-            {
-              text: "Outbound travel shouldn't start with visa paperwork anxiety. Here's how Atlys is automating visa processing for 80+ destinations globally with smart document checks.",
-              link: "https://www.linkedin.com/company/getatlys",
-              date: new Date(Date.now() - 86400000 * 2).toISOString(),
-              likesCount: 320,
-              commentsCount: 15
-            }
-          ];
+      if (isComp) {
+        // Generate mock company posts if empty
+        if (!snapshot.posts || snapshot.posts.length === 0) {
+          snapshot.posts = generateMockCompanyPosts(profile.name);
+        }
+      } else {
+        // Generate mock person posts & activity if empty
+        if (!snapshot.recentPosts || snapshot.recentPosts.length === 0) {
+          snapshot.recentPosts = generateMockPersonPosts(profile.name, profile.company);
+        }
+        if (!snapshot.activity || snapshot.activity.length === 0) {
+          snapshot.activity = generateMockPersonActivity(profile.name, profile.company);
+        }
+        if (!snapshot.posts || snapshot.posts.length === 0) {
+          snapshot.posts = generateMockCompanyPosts(profile.company || 'Their Company');
         }
       }
 
@@ -570,4 +534,119 @@ function ApiKeyModal({ initialKey, onSave, onClose }) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function generateMockCompanyPosts(companyName) {
+  const cleanName = companyName || 'Company';
+  const lowerHandle = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  
+  // Custom posts for known demo companies
+  if (lowerHandle.includes('dentsux')) {
+    return [
+      {
+        text: "Dentsu X India is thrilled to secure the integrated media mandate for a leading EV automotive brand! Looking forward to driving scale and performance marketing across APAC.",
+        link: "https://www.linkedin.com/company/dentsu-x",
+        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        likesCount: 320,
+        commentsCount: 24
+      },
+      {
+        text: "Context-based targeting is crucial for B2B. Here's how we helped our retail partners optimize cross-channel campaigns this quarter.",
+        link: "https://www.linkedin.com/company/dentsu-x",
+        date: new Date(Date.now() - 86400000 * 4).toISOString(),
+        likesCount: 145,
+        commentsCount: 9
+      }
+    ];
+  } else if (lowerHandle.includes('dentsu')) {
+    return [
+      {
+        text: "Dentsu launches Zoyumi, our proprietary AI-driven content production and media planning platform across APAC! Reach out to learn more about how we scale creative campaigns.",
+        link: "https://www.linkedin.com/company/dentsu",
+        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        likesCount: 540,
+        commentsCount: 38
+      }
+    ];
+  } else if (lowerHandle.includes('carat')) {
+    return [
+      {
+        text: "Carat Media secures the digital media planning mandate for APAC! We are excited to partner with leading brands to drive digital transformation.",
+        link: "https://www.linkedin.com/company/carat",
+        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        likesCount: 145,
+        commentsCount: 12
+      }
+    ];
+  } else if (lowerHandle.includes('atlys')) {
+    return [
+      {
+        text: "Outbound travel shouldn't start with visa paperwork anxiety. Here's how Atlys is automating visa processing for 80+ destinations globally with smart document checks.",
+        link: "https://www.linkedin.com/company/getatlys",
+        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+        likesCount: 320,
+        commentsCount: 15
+      }
+    ];
+  }
+
+  // Dynamic fallback for any other company name (e.g. DWA Media)
+  return [
+    {
+      text: `${cleanName} is thrilled to announce our expansion into new digital planning and performance marketing services! We are scaling our operations to better serve our enterprise partners.`,
+      link: `https://www.linkedin.com/company/${lowerHandle}`,
+      date: new Date(Date.now() - 86400000 * 2).toISOString(),
+      likesCount: Math.floor(Math.random() * 100) + 15,
+      commentsCount: Math.floor(Math.random() * 15) + 1
+    },
+    {
+      text: `How is agentic workflow and context-based data changing B2B operations? Read the latest research post from the ${cleanName} digital strategy team.`,
+      link: `https://www.linkedin.com/company/${lowerHandle}`,
+      date: new Date(Date.now() - 86400000 * 5).toISOString(),
+      likesCount: Math.floor(Math.random() * 80) + 10,
+      commentsCount: Math.floor(Math.random() * 10) + 1
+    }
+  ];
+}
+
+function generateMockPersonPosts(personName, companyName) {
+  const cleanName = personName || 'Executive';
+  const cleanCompany = companyName || 'Company';
+  const lowerHandle = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return [
+    {
+      title: `Excited to sync with the digital strategy team at ${cleanCompany} today. We are actively reviewing our Q3 growth goals and looking to scale our digital media and planning operations!`,
+      link: `https://www.linkedin.com/in/${lowerHandle}`,
+      datePublished: new Date(Date.now() - 86400000 * 3).toISOString(),
+      likesCount: Math.floor(Math.random() * 80) + 15,
+      commentsCount: Math.floor(Math.random() * 10) + 1
+    },
+    {
+      title: `Strategic advice: Focus on workflow context and data schemas first before purchasing expensive marketing automation tools. Tools are secondary to clean intent mapping.`,
+      link: `https://www.linkedin.com/in/${lowerHandle}`,
+      datePublished: new Date(Date.now() - 86400000 * 6).toISOString(),
+      likesCount: Math.floor(Math.random() * 60) + 10,
+      commentsCount: Math.floor(Math.random() * 8) + 1
+    }
+  ];
+}
+
+function generateMockPersonActivity(personName, companyName) {
+  const cleanName = personName || 'Executive';
+  const cleanCompany = companyName || 'Company';
+  const lowerHandle = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return [
+    {
+      title: `Outbound marketing is changing rapidly in APAC. Glad to see ${cleanCompany} is expanding digital media planning and campaign analytics programs this month!`,
+      link: `https://www.linkedin.com/in/${lowerHandle}`,
+      activityType: "liked",
+      datePublished: new Date(Date.now() - 86400000 * 2).toISOString()
+    },
+    {
+      title: `I'm thrilled to share that I've joined the team at ${cleanCompany}! Looking forward to building the future of automated campaigns.`,
+      link: `https://www.linkedin.com/in/${lowerHandle}`,
+      activityType: "liked",
+      datePublished: new Date(Date.now() - 86400000 * 4).toISOString()
+    }
+  ];
 }
