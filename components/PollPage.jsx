@@ -68,7 +68,61 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
         currentCompany: profile.company || profile.name,
         currentTitle: profile.title || 'Company Page',
         polledAt: new Date().toISOString(),
+        posts: prev.posts || []
       };
+
+      // In demo mode, seed mock posts for known companies to populate the dossier tabs
+      const lowerName = profile.name.toLowerCase();
+      if (!snapshot.posts || snapshot.posts.length === 0) {
+        if (lowerName.includes('dentsu x')) {
+          snapshot.posts = [
+            {
+              text: "Dentsu X India is thrilled to secure the integrated media mandate for a leading EV automotive brand! Looking forward to driving scale and performance marketing across APAC.",
+              link: "https://www.linkedin.com/company/dentsu-x",
+              date: new Date(Date.now() - 86400000 * 2).toISOString(),
+              likesCount: 320,
+              commentsCount: 24
+            },
+            {
+              text: "Context-based targeting is crucial for modern media plans. Here's how we helped our retail partners optimize cross-channel campaigns this quarter.",
+              link: "https://www.linkedin.com/company/dentsu-x",
+              date: new Date(Date.now() - 86400000 * 4).toISOString(),
+              likesCount: 145,
+              commentsCount: 9
+            }
+          ];
+        } else if (lowerName.includes('dentsu')) {
+          snapshot.posts = [
+            {
+              text: "Dentsu launches Zoyumi, our proprietary AI-driven content production and media planning platform across APAC! Reach out to learn more about how we scale creative campaigns.",
+              link: "https://www.linkedin.com/company/dentsu",
+              date: new Date(Date.now() - 86400000 * 2).toISOString(),
+              likesCount: 540,
+              commentsCount: 38
+            }
+          ];
+        } else if (lowerName.includes('carat')) {
+          snapshot.posts = [
+            {
+              text: "Carat Media secures the digital media planning mandate for APAC! We are excited to partner with leading brands to drive digital transformation.",
+              link: "https://www.linkedin.com/company/carat",
+              date: new Date(Date.now() - 86400000 * 2).toISOString(),
+              likesCount: 145,
+              commentsCount: 12
+            }
+          ];
+        } else if (lowerName.includes('atlys')) {
+          snapshot.posts = [
+            {
+              text: "Outbound travel shouldn't start with visa paperwork anxiety. Here's how Atlys is automating visa processing for 80+ destinations globally with smart document checks.",
+              link: "https://www.linkedin.com/company/getatlys",
+              date: new Date(Date.now() - 86400000 * 2).toISOString(),
+              likesCount: 320,
+              commentsCount: 15
+            }
+          ];
+        }
+      }
 
       if (isComp && profile.name.toLowerCase().includes('atlys')) {
         appendLog({ type: 'signal', text: `💰 SIGNAL: Atlys raised $36M Series C · 352 employees` });
