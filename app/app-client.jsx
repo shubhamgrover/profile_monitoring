@@ -8,12 +8,14 @@ import PollPage from '../components/PollPage';
 import Auth from '../components/Auth';
 import { supabase } from '../lib/supabaseClient';
 import { REAL_PROFILES, REAL_SIGNALS, REAL_CREDITS } from '../lib/realData';
+import IpIntelligencePage from '../components/IpIntelligencePage';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Signal Dashboard', icon: '⚡' },
   { id: 'upload', label: 'Upload Profiles', icon: '📁' },
   { id: 'profiles', label: 'Monitored Profiles', icon: '👥' },
   { id: 'poll', label: 'Run Poll', icon: '🔄' },
+  { id: 'ip-intel', label: 'IP Intelligence', icon: '🌐' },
 ];
 
 export default function App() {
@@ -21,6 +23,8 @@ export default function App() {
   const [page, setPage] = useState('dashboard');
   const [profiles, setProfiles] = useState([]);
   const [signals, setSignals] = useState([]);
+  const [trackerId, setTrackerId] = useState(null);
+  const [visitorLogs, setVisitorLogs] = useState([]);
   const [recentSignalIds, setRecentSignalIds] = useState(new Set());
   const [apiKey, setApiKey] = useState('cwG38owB6JPGD6YMF5VhTfrAeBn2');
   const [toast, setToast] = useState(null);
@@ -64,22 +68,51 @@ export default function App() {
     if (!session) {
       setProfiles([]);
       setSignals([]);
+      setTrackerId(null);
+      setVisitorLogs([]);
       return;
     }
 
     async function hydrateCache() {
       setLoadingData(true);
       try {
-        const [profilesRes, signalsRes] = await Promise.all([
+        const [profilesRes, signalsRes, trackersRes, logsRes] = await Promise.all([
           supabase.from('profiles').select('*').order('added_at', { ascending: false }),
-          supabase.from('signals').select('*').order('detected_at', { ascending: false })
+          supabase.from('signals').select('*').order('detected_at', { ascending: false }),
+          supabase.from('client_trackers').select('*'),
+          supabase.from('visitor_logs').select('*').order('created_at', { ascending: false })
         ]);
 
         if (profilesRes.error) throw profilesRes.error;
         if (signalsRes.error) throw signalsRes.error;
+        if (trackersRes.error) throw trackersRes.error;
+        if (logsRes.error) throw logsRes.error;
 
         setProfiles((profilesRes.data || []).map(mapProfile));
         setSignals((signalsRes.data || []).map(mapSignal));
+        setVisitorLogs(logsRes.data || []);
+
+        let currentTrackerId = null;
+        if (trackersRes.data && trackersRes.data.length > 0) {
+          currentTrackerId = trackersRes.data[0].id;
+          setTrackerId(currentTrackerId);
+        } else {
+          // Auto-generate a default tracker token for the user if they don't have one
+          const { data: newTracker, error: trackerCreateErr } = await supabase
+            .from('client_trackers')
+            .insert({
+              user_id: session.user.id,
+              site_url: ''
+            })
+            .select()
+            .single();
+
+          if (trackerCreateErr) throw trackerCreateErr;
+          if (newTracker) {
+            currentTrackerId = newTracker.id;
+            setTrackerId(currentTrackerId);
+          }
+        }
       } catch (err) {
         console.error("Error hydrating Supabase data cache:", err.message);
         showToast("⚠️ Error loading database cache");
@@ -94,16 +127,19 @@ export default function App() {
   const refreshData = async () => {
     if (!session) return;
     try {
-      const [profilesRes, signalsRes] = await Promise.all([
+      const [profilesRes, signalsRes, logsRes] = await Promise.all([
         supabase.from('profiles').select('*').order('added_at', { ascending: false }),
-        supabase.from('signals').select('*').order('detected_at', { ascending: false })
+        supabase.from('signals').select('*').order('detected_at', { ascending: false }),
+        supabase.from('visitor_logs').select('*').order('created_at', { ascending: false })
       ]);
 
       if (profilesRes.error) throw profilesRes.error;
       if (signalsRes.error) throw signalsRes.error;
+      if (logsRes.error) throw logsRes.error;
 
       setProfiles((profilesRes.data || []).map(mapProfile));
       setSignals((signalsRes.data || []).map(mapSignal));
+      setVisitorLogs(logsRes.data || []);
     } catch (err) {
       console.error("Error refreshing Supabase state:", err);
     }
@@ -340,6 +376,13 @@ export default function App() {
             onProfilesUpdated={refreshData}
             onSignalsDetected={handleSignalsDetected}
             onNavigate={setPage}
+          />
+        )}
+        {page === 'ip-intel' && (
+          <IpIntelligencePage
+            trackerId={trackerId}
+            visitorLogs={visitorLogs}
+            onRefresh={refreshData}
           />
         )}
       </main>
