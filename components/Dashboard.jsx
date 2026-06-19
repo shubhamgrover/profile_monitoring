@@ -163,6 +163,7 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [showRecentOnly, setShowRecentOnly] = useState(false);
+  const [showTodayOnly, setShowTodayOnly] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailAddress, setEmailAddress] = useState('');
   const [emailStatus, setEmailStatus] = useState(null);
@@ -214,6 +215,11 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
   const filtered = signals.filter(s => {
     if (filter !== 'all' && s.priority !== filter) return false;
     if (showRecentOnly && recentSignalIds && !recentSignalIds.has(s.id)) return false;
+    if (showTodayOnly) {
+      const signalDate = new Date(s.detectedAt);
+      const today = new Date();
+      if (signalDate.toDateString() !== today.toDateString()) return false;
+    }
     if (search && !s.profile?.toLowerCase().includes(search.toLowerCase()) &&
         !s.company?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -294,7 +300,7 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
               </button>
             ))}
           </div>
-          {recentSignalIds && recentSignalIds.size > 0 && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -310,13 +316,36 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
             }}>
               <input
                 type="checkbox"
-                checked={showRecentOnly}
-                onChange={e => setShowRecentOnly(e.target.checked)}
+                checked={showTodayOnly}
+                onChange={e => setShowTodayOnly(e.target.checked)}
                 style={{ accentColor: 'var(--accent-blue)', cursor: 'pointer' }}
               />
-              🆕 Latest Run Only
+              📅 Detected Today
             </label>
-          )}
+            {recentSignalIds && recentSignalIds.size > 0 && (
+              <label style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '8px 12px',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                whiteSpace: 'nowrap'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={showRecentOnly}
+                  onChange={e => setShowRecentOnly(e.target.checked)}
+                  style={{ accentColor: 'var(--accent-blue)', cursor: 'pointer' }}
+                />
+                🆕 Latest Run Only
+              </label>
+            )}
+          </div>
         </div>
 
         {filtered.length === 0 ? (
