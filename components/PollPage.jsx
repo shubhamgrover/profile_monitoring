@@ -207,88 +207,93 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
         setProgress(update.pct);
         appendLog({ type: 'info', text: `Polling LinkedIn profile ${update.profileName}... (${update.current}/${update.total})` });
       } else if (update.type === 'success') {
-        const prev = (update.profile?.snapshots && update.profile?.snapshots[update.profile.snapshots.length - 1]) || {};
-        const snapshot = {
-          ...prev,
-          ...update.snapshot
-        };
-
-        // Run baseline LinkedIn signal detection
-        const linkedinSignals = detectSignals(update.profile, prev, snapshot);
-        if (linkedinSignals.length > 0) {
-          linkedinSignals.forEach(s => {
-            appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.profile}` });
-          });
-          allSignals.push(...linkedinSignals);
-          setSignalsFound(prevVal => prevVal + linkedinSignals.length);
-        } else {
-          appendLog({ type: 'success', text: `✓ ${update.profile?.name} — LinkedIn baseline checked` });
-        }
-
-        // Fetch external brand mentions & sitemaps (Google News, Reddit, Twitter, YouTube, Firecrawl)
         try {
-          appendLog({ type: 'info', text: `🔍 Querying Google News, Reddit, Twitter, and YouTube for "${update.profile?.company || update.profile?.name}"...` });
-          const extRes = await fetch('/api/collectors/all', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              companyName: update.profile?.company || update.profile?.name,
-              companyDomain: update.profile?.companyLinkedinUrl ? '' : ''
-            }),
-          });
+          const prev = (update.profile?.snapshots && update.profile?.snapshots[update.profile.snapshots.length - 1]) || {};
+          const snapshot = {
+            ...prev,
+            ...update.snapshot
+          };
 
-          if (extRes.ok) {
-            const extData = await extRes.json();
-            
-            if (extData) {
-              snapshot.sitemapLinks = extData.sitemapLinks || [];
-              snapshot.youtubeVideos = extData.youtubeVideos || [];
-              snapshot.jobOpenings = extData.jobOpenings || [];
-              snapshot.prMentions = extData.prMentions || [];
-              snapshot.redditMentions = extData.redditMentions || [];
-              snapshot.twitterMentions = extData.twitterMentions || [];
-              snapshot.resolvedDomain = extData.resolvedDomain || '';
+          // Run baseline LinkedIn signal detection
+          const linkedinSignals = detectSignals(update.profile, prev, snapshot);
+          if (linkedinSignals.length > 0) {
+            linkedinSignals.forEach(s => {
+              appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.profile}` });
+            });
+            allSignals.push(...linkedinSignals);
+            setSignalsFound(prevVal => prevVal + linkedinSignals.length);
+          } else {
+            appendLog({ type: 'success', text: `✓ ${update.profile?.name} — LinkedIn baseline checked` });
+          }
 
-              if (extData.sitemapLinks && extData.sitemapLinks.length > 0) {
-                appendLog({ type: 'success', text: `🌐 Firecrawl: sitemap mapped ${extData.sitemapLinks.length} URLs` });
+          // Fetch external brand mentions & sitemaps (Google News, Reddit, Twitter, YouTube, Firecrawl)
+          try {
+            appendLog({ type: 'info', text: `🔍 Querying Google News, Reddit, Twitter, and YouTube for "${update.profile?.company || update.profile?.name}"...` });
+            const extRes = await fetch('/api/collectors/all', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                companyName: update.profile?.company || update.profile?.name,
+                companyDomain: update.profile?.companyLinkedinUrl ? '' : ''
+              }),
+            });
+
+            if (extRes.ok) {
+              const extData = await extRes.json();
+              
+              if (extData) {
+                snapshot.sitemapLinks = extData.sitemapLinks || [];
+                snapshot.youtubeVideos = extData.youtubeVideos || [];
+                snapshot.jobOpenings = extData.jobOpenings || [];
+                snapshot.prMentions = extData.prMentions || [];
+                snapshot.redditMentions = extData.redditMentions || [];
+                snapshot.twitterMentions = extData.twitterMentions || [];
+                snapshot.resolvedDomain = extData.resolvedDomain || '';
+
+                if (extData.sitemapLinks && extData.sitemapLinks.length > 0) {
+                  appendLog({ type: 'success', text: `🌐 Firecrawl: sitemap mapped ${extData.sitemapLinks.length} URLs` });
+                }
+
+                if (extData.youtubeVideos && extData.youtubeVideos.length > 0) {
+                  appendLog({ type: 'success', text: `🎥 YouTube Feed: resolved channel and fetched latest videos` });
+                }
+
+                if (extData.jobOpenings && extData.jobOpenings.length > 0) {
+                  appendLog({ type: 'success', text: `💼 Jobs: found ${extData.jobOpenings.length} active job vacancies` });
+                }
               }
 
-              if (extData.youtubeVideos && extData.youtubeVideos.length > 0) {
-                appendLog({ type: 'success', text: `🎥 YouTube Feed: resolved channel and fetched latest videos` });
-              }
-
-              if (extData.jobOpenings && extData.jobOpenings.length > 0) {
-                appendLog({ type: 'success', text: `💼 Jobs: found ${extData.jobOpenings.length} active job vacancies` });
+              const extSignals = detectExternalSignals(update.profile, extData, prev);
+              if (extSignals.length > 0) {
+                extSignals.forEach(s => {
+                  appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.source}` });
+                });
+                allSignals.push(...extSignals);
+                setSignalsFound(prevVal => prevVal + extSignals.length);
               }
             }
+          } catch (err) {
+            console.error('Error fetching external collectors:', err);
+          }
 
-            const extSignals = detectExternalSignals(update.profile, extData, prev);
-            if (extSignals.length > 0) {
-              extSignals.forEach(s => {
-                appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.source}` });
-              });
-              allSignals.push(...extSignals);
-              setSignalsFound(prevVal => prevVal + extSignals.length);
-            }
+          // Update the profile in Supabase
+          try {
+            const currentSnapshots = update.profile?.snapshots || [];
+            const { error } = await supabase
+              .from('profiles')
+              .update({
+                status: 'active',
+                last_polled: new Date().toISOString(),
+                snapshots: [...currentSnapshots, snapshot]
+              })
+              .eq('id', update.profile?.id);
+            if (error) throw error;
+          } catch (err) {
+            console.error("Error updating profile status in Supabase:", err);
           }
         } catch (err) {
-          console.error('Error fetching external collectors:', err);
-        }
-
-        // Update the profile in Supabase
-        try {
-          const currentSnapshots = update.profile?.snapshots || [];
-          const { error } = await supabase
-            .from('profiles')
-            .update({
-              status: 'active',
-              last_polled: new Date().toISOString(),
-              snapshots: [...currentSnapshots, snapshot]
-            })
-            .eq('id', update.profile?.id);
-          if (error) throw error;
-        } catch (err) {
-          console.error("Error updating profile status in Supabase:", err);
+          appendLog({ type: 'info', text: `⚠ Error processing profile ${update.profileName}: ${err.message}` });
+          console.error("Error processing successful profile scrape:", err);
         }
 
       } else if (update.type === 'error') {
