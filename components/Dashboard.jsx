@@ -819,6 +819,115 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   const [copiedScriptIndex, setCopiedScriptIndex] = useState(-1);
   const [fetchingProfiles, setFetchingProfiles] = useState(false);
   const [profileActivity, setProfileActivity] = useState(null);
+  const [editingIndex, setEditingIndex] = useState(-1);
+  const [editTitle, setEditTitle] = useState('');
+  const [editNarrative, setEditNarrative] = useState('');
+  const [editScript, setEditScript] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleSaveEdit = async (idx) => {
+    setSavingEdit(true);
+    try {
+      const updatedCorrelations = [...(synthesis.strategicCorrelations || [])];
+      updatedCorrelations[idx] = {
+        ...updatedCorrelations[idx],
+        title: editTitle,
+        narrative: editNarrative,
+        script: editScript,
+        reviewed: true
+      };
+
+      const updatedSynthesis = {
+        ...synthesis,
+        strategicCorrelations: updatedCorrelations
+      };
+
+      setSynthesis(updatedSynthesis);
+
+      const { data: existingProfiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`company.ilike."${group.company}",name.ilike."${group.company}"`);
+      
+      let targetProfile = null;
+      if (existingProfiles && existingProfiles.length > 0) {
+        targetProfile = existingProfiles.find(p => (p.company || '').toLowerCase() === group.company.toLowerCase()) || existingProfiles[0];
+      }
+
+      if (targetProfile && Array.isArray(targetProfile.snapshots) && targetProfile.snapshots.length > 0) {
+        const updatedSnapshots = [...targetProfile.snapshots];
+        const lastIdx = updatedSnapshots.length - 1;
+        updatedSnapshots[lastIdx] = {
+          ...updatedSnapshots[lastIdx],
+          synthesis: updatedSynthesis
+        };
+
+        const { error } = await supabase
+          .from('profiles')
+          .update({ snapshots: updatedSnapshots })
+          .eq('id', targetProfile.id);
+
+        if (error) throw error;
+      }
+      
+      setEditingIndex(-1);
+      if (onProfilesUpdated) {
+        onProfilesUpdated();
+      }
+    } catch (err) {
+      console.error('Error saving play edit:', err);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleToggleReviewed = async (idx) => {
+    try {
+      const updatedCorrelations = [...(synthesis.strategicCorrelations || [])];
+      const isReviewed = !updatedCorrelations[idx].reviewed;
+      updatedCorrelations[idx] = {
+        ...updatedCorrelations[idx],
+        reviewed: isReviewed
+      };
+
+      const updatedSynthesis = {
+        ...synthesis,
+        strategicCorrelations: updatedCorrelations
+      };
+
+      setSynthesis(updatedSynthesis);
+
+      const { data: existingProfiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`company.ilike."${group.company}",name.ilike."${group.company}"`);
+      
+      let targetProfile = null;
+      if (existingProfiles && existingProfiles.length > 0) {
+        targetProfile = existingProfiles.find(p => (p.company || '').toLowerCase() === group.company.toLowerCase()) || existingProfiles[0];
+      }
+
+      if (targetProfile && Array.isArray(targetProfile.snapshots) && targetProfile.snapshots.length > 0) {
+        const updatedSnapshots = [...targetProfile.snapshots];
+        const lastIdx = updatedSnapshots.length - 1;
+        updatedSnapshots[lastIdx] = {
+          ...updatedSnapshots[lastIdx],
+          synthesis: updatedSynthesis
+        };
+
+        await supabase
+          .from('profiles')
+          .update({ snapshots: updatedSnapshots })
+          .eq('id', targetProfile.id);
+      }
+      
+      if (onProfilesUpdated) {
+        onProfilesUpdated();
+      }
+    } catch (err) {
+      console.error('Error reviewing play:', err);
+    }
+  };
 
   // Sync synthesis and autoboundSignals state when profiles/snapData updates from the backend/polling save
   useEffect(() => {
@@ -1233,7 +1342,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
                   style={{
                     background: '#FFFFFF',
                     border: '1px solid var(--border)',
-                    borderLeft: '4px solid #132D7D',
+                    borderLeft: corr.reviewed ? '4px solid #10B981' : '4px solid #132D7D',
                     padding: '18px 20px',
                     display: 'flex',
                     flexDirection: 'column',
@@ -1249,61 +1358,155 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
                       <span style={{ fontSize: 10, fontWeight: 850, color: '#FF2A00', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                         ⚡ TRIGGER EVENT (X, Y, Z)
                       </span>
-                      <span style={{ fontSize: 8.5, fontWeight: 700, padding: '2px 6px', background: 'rgba(19, 45, 125, 0.06)', color: '#132D7D', borderRadius: 0 }}>
-                        SYNTHESIS PLAY #{idx + 1}
-                      </span>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {corr.reviewed && (
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', background: '#D1FAE5', color: '#065F46', border: '1px solid #A7F3D0' }}>
+                            ✓ Approved Play
+                          </span>
+                        )}
+                        <span style={{ fontSize: 8.5, fontWeight: 700, padding: '2px 6px', background: 'rgba(19, 45, 125, 0.06)', color: '#132D7D', borderRadius: 0 }}>
+                          SYNTHESIS PLAY #{idx + 1}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#1E293B' }}>{corr.title}</div>
+                    {editingIndex === idx ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: '#64748B' }}>PLAY TITLE</label>
+                        <input 
+                          type="text" 
+                          value={editTitle} 
+                          onChange={e => setEditTitle(e.target.value)} 
+                          style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#1E293B' }}>{corr.title}</div>
+                    )}
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                       <strong>Channels:</strong> {corr.evidence}
                     </div>
                   </div>
 
-                  {/* Logical Shift (A) */}
-                  <div>
-                    <div style={{ fontSize: 10, fontWeight: 850, color: '#64748B', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>
-                      💡 WHAT IT GENERALLY MEANS (A)
-                    </div>
-                    <div style={{ fontSize: 12.5, color: '#334155', lineHeight: 1.5, fontWeight: 500 }}>
-                      {corr.narrative}
-                    </div>
-                    {corr.friction && (
-                      <div style={{ fontSize: 12, color: '#D97706', background: '#FEF3C7', padding: '6px 10px', borderLeft: '3px solid #D97706', marginTop: 8 }}>
-                        <strong>Immediate Headache:</strong> {corr.friction}
+                  {editingIndex === idx ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: '#64748B' }}>WHAT IT GENERALLY MEANS (A)</label>
+                        <textarea 
+                          rows={2}
+                          value={editNarrative} 
+                          onChange={e => setEditNarrative(e.target.value)} 
+                          style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid var(--border)', fontFamily: 'inherit' }}
+                        />
                       </div>
-                    )}
-                  </div>
-
-                  {/* Pitch (P) */}
-                  {corr.script && (
-                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 12, borderRadius: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontSize: 10, fontWeight: 850, color: '#132D7D', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                          💬 OUR OUTBOUND PITCH
-                        </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: '#132D7D' }}>OUTBOUND PITCH (P)</label>
+                        <textarea 
+                          rows={3}
+                          value={editScript} 
+                          onChange={e => setEditScript(e.target.value)} 
+                          style={{ width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid var(--border)', fontFamily: 'inherit' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                         <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(corr.script);
-                            setCopiedScriptIndex(idx);
-                            setTimeout(() => setCopiedScriptIndex(-1), 2000);
-                          }}
-                          style={{
-                            fontSize: 9,
-                            padding: '2px 8px',
-                            background: copiedScriptIndex === idx ? '#10B981' : '#FFFFFF',
-                            border: `1px solid ${copiedScriptIndex === idx ? '#10B981' : '#CBD5E1'}`,
-                            color: copiedScriptIndex === idx ? '#FFFFFF' : '#1E293B',
-                            cursor: 'pointer',
-                            fontWeight: 700
-                          }}
+                          onClick={() => handleSaveEdit(idx)} 
+                          disabled={savingEdit}
+                          style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: '#10B981', color: 'white', border: 'none', cursor: 'pointer' }}
                         >
-                          {copiedScriptIndex === idx ? '✓ Copied' : 'Copy Pitch'}
+                          {savingEdit ? 'Saving...' : '💾 Save Play'}
+                        </button>
+                        <button 
+                          onClick={() => setEditingIndex(-1)} 
+                          style={{ padding: '5px 12px', fontSize: 11, fontWeight: 700, background: '#FFFFFF', border: '1px solid #CBD5E1', color: '#1E293B', cursor: 'pointer' }}
+                        >
+                          Cancel
                         </button>
                       </div>
-                      <div style={{ fontSize: 12.5, color: '#0F172A', fontStyle: 'italic', lineHeight: 1.5 }}>
-                        {corr.script}
-                      </div>
                     </div>
+                  ) : (
+                    <>
+                      {/* Logical Shift (A) */}
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 850, color: '#64748B', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>
+                          💡 WHAT IT GENERALLY MEANS (A)
+                        </div>
+                        <div style={{ fontSize: 12.5, color: '#334155', lineHeight: 1.5, fontWeight: 500 }}>
+                          {corr.narrative}
+                        </div>
+                        {corr.friction && (
+                          <div style={{ fontSize: 12, color: '#D97706', background: '#FEF3C7', padding: '6px 10px', borderLeft: '3px solid #D97706', marginTop: 8 }}>
+                            <strong>Immediate Headache:</strong> {corr.friction}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pitch (P) */}
+                      {corr.script && (
+                        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: 12, borderRadius: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 850, color: '#132D7D', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                              💬 OUR OUTBOUND PITCH
+                            </span>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                onClick={() => {
+                                  setEditingIndex(idx);
+                                  setEditTitle(corr.title || '');
+                                  setEditNarrative(corr.narrative || '');
+                                  setEditScript(corr.script || '');
+                                }}
+                                style={{
+                                  fontSize: 9,
+                                  padding: '2px 8px',
+                                  background: '#FFFFFF',
+                                  border: '1px solid #CBD5E1',
+                                  color: '#1E293B',
+                                  cursor: 'pointer',
+                                  fontWeight: 700
+                                }}
+                              >
+                                ✏️ Edit Play
+                              </button>
+                              <button
+                                onClick={() => handleToggleReviewed(idx)}
+                                style={{
+                                  fontSize: 9,
+                                  padding: '2px 8px',
+                                  background: corr.reviewed ? '#F3F4F6' : '#FFFFFF',
+                                  border: `1px solid ${corr.reviewed ? '#D1D5DB' : '#CBD5E1'}`,
+                                  color: corr.reviewed ? '#6B7280' : '#047857',
+                                  cursor: 'pointer',
+                                  fontWeight: 700
+                                }}
+                              >
+                                {corr.reviewed ? 'Unmark Approved' : '✓ Approve Play'}
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(corr.script);
+                                  setCopiedScriptIndex(idx);
+                                  setTimeout(() => setCopiedScriptIndex(-1), 2000);
+                                }}
+                                style={{
+                                  fontSize: 9,
+                                  padding: '2px 8px',
+                                  background: copiedScriptIndex === idx ? '#10B981' : '#FFFFFF',
+                                  border: `1px solid ${copiedScriptIndex === idx ? '#10B981' : '#CBD5E1'}`,
+                                  color: copiedScriptIndex === idx ? '#FFFFFF' : '#1E293B',
+                                  cursor: 'pointer',
+                                  fontWeight: 700
+                                }}
+                              >
+                                {copiedScriptIndex === idx ? '✓ Copied' : 'Copy Pitch'}
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 12.5, color: '#0F172A', fontStyle: 'italic', lineHeight: 1.5 }}>
+                            {corr.script}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* Target Contact (U) */}

@@ -14,9 +14,8 @@ import DailyBriefPage from '../components/DailyBriefPage';
 import OnboardingWizard from '../components/OnboardingWizard';
 
 const NAV_ITEMS = [
-  { id: 'brief', label: "Today's Targets", icon: '📋' },
-  { id: 'feed', label: 'Signal Center', icon: '📡' },
-  { id: 'profiles', label: 'Monitored Accounts', icon: '👥' },
+  { id: 'opportunity', label: 'Opportunity Dashboard', icon: '📊' },
+  { id: 'profiles', label: 'Watchlist & Control', icon: '👥' },
 ];
 
 export default function App() {
@@ -331,56 +330,42 @@ export default function App() {
         </div>
 
         <nav className="sidebar-nav" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.id}
-              id={`nav-${item.id}`}
-              className={`nav-item ${page === item.id ? 'active' : ''}`}
-              onClick={() => setPage(item.id)}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              {item.label}
-              {item.id === 'brief' && signals.filter(s => !s.dismissed).length > 0 && (
-                <span style={{
-                  marginLeft: 'auto',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  color: 'white',
-                  borderRadius: '10px',
-                  padding: '1px 7px',
-                  fontSize: 11,
-                  fontWeight: 700,
-                }}>
-                  {signals.filter(s => !s.dismissed).length}
-                </span>
-              )}
-              {item.id === 'dashboard' && signals.filter(s => s.priority === 'urgent' && !s.dismissed).length > 0 && (
-                <span style={{
-                  marginLeft: 'auto',
-                  background: 'var(--signal-red)',
-                  color: 'white',
-                  borderRadius: '10px',
-                  padding: '1px 7px',
-                  fontSize: 11,
-                  fontWeight: 700,
-                }}>
-                  {signals.filter(s => s.priority === 'urgent' && !s.dismissed).length}
-                </span>
-              )}
-              {item.id === 'feed' && signals.filter(s => !s.dismissed).length > 0 && (
-                <span style={{
-                  marginLeft: 'auto',
-                  background: 'var(--accent-blue)',
-                  color: 'white',
-                  borderRadius: '10px',
-                  padding: '1px 7px',
-                  fontSize: 11,
-                  fontWeight: 700,
-                }}>
-                  {signals.filter(s => !s.dismissed).length}
-                </span>
-              )}
-            </button>
-          ))}
+          {NAV_ITEMS.map(item => {
+            const isActive = item.id === 'opportunity' 
+              ? (page === 'brief' || page === 'feed') 
+              : (page === item.id);
+            const handleClick = () => {
+              if (item.id === 'opportunity') {
+                setPage('brief');
+              } else {
+                setPage(item.id);
+              }
+            };
+            return (
+              <button
+                key={item.id}
+                id={`nav-${item.id}`}
+                className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={handleClick}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                {item.label}
+                {item.id === 'opportunity' && signals.filter(s => !s.dismissed).length > 0 && (
+                  <span style={{
+                    marginLeft: 'auto',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: 'white',
+                    borderRadius: '10px',
+                    padding: '1px 7px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}>
+                    {signals.filter(s => !s.dismissed).length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
 
           {/* Log Out button at the bottom of the navigation */}
           <button
@@ -418,23 +403,93 @@ export default function App() {
 
       {/* Main content */}
       <main className="main">
-        {page === 'brief' && (
-          <Dashboard
-            signals={signals.filter(s => !s.dismissed)}
-            profiles={profiles}
-            credits={credits}
-            onNavigate={setPage}
-            recentSignalIds={recentSignalIds}
-            onDismiss={handleDismissSignal}
-            targetDept={targetDept}
-            setTargetDept={setTargetDept}
-            targetSeniority={targetSeniority}
-            setTargetSeniority={setTargetSeniority}
-            correlateCache={correlateCache}
-            setCorrelateCache={setCorrelateCache}
-            userId={session?.user?.id}
-            onProfilesUpdated={refreshData}
-          />
+        {(page === 'brief' || page === 'feed') && (
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+            {/* Top Sub-Nav Switcher */}
+            <div style={{
+              background: '#FFFFFF',
+              borderBottom: '1px solid #E2E8F0',
+              padding: '12px 28px',
+              display: 'flex',
+              gap: 24,
+              alignItems: 'center'
+            }}>
+              <button
+                onClick={() => setPage('brief')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '6px 4px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: page === 'brief' ? '#132D7D' : '#718096',
+                  borderBottom: page === 'brief' ? '2px solid #132D7D' : '2px solid transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all 0.2s'
+                }}
+              >
+                🎯 Today's Targets
+              </button>
+              <button
+                onClick={() => setPage('feed')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '6px 4px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: page === 'feed' ? '#132D7D' : '#718096',
+                  borderBottom: page === 'feed' ? '2px solid #132D7D' : '2px solid transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  transition: 'all 0.2s'
+                }}
+              >
+                📡 Signal Center
+              </button>
+            </div>
+            {page === 'brief' ? (
+              <Dashboard
+                signals={signals.filter(s => !s.dismissed)}
+                profiles={profiles}
+                credits={credits}
+                onNavigate={setPage}
+                recentSignalIds={recentSignalIds}
+                onDismiss={handleDismissSignal}
+                targetDept={targetDept}
+                setTargetDept={setTargetDept}
+                targetSeniority={targetSeniority}
+                setTargetSeniority={setTargetSeniority}
+                correlateCache={correlateCache}
+                setCorrelateCache={setCorrelateCache}
+                userId={session?.user?.id}
+                onProfilesUpdated={refreshData}
+              />
+            ) : (
+              <SignalFeedPage
+                signals={signals}
+                profiles={profiles}
+                onNavigate={setPage}
+                onDismiss={handleDismissSignal}
+                targetDept={targetDept}
+                setTargetDept={setTargetDept}
+                targetSeniority={targetSeniority}
+                setTargetSeniority={setTargetSeniority}
+                trackerId={trackerId}
+                visitorLogs={visitorLogs}
+                onRefresh={refreshData}
+                onboardingSettings={onboardingSettings}
+                correlateCache={correlateCache}
+                setCorrelateCache={setCorrelateCache}
+                userId={session?.user?.id}
+              />
+            )}
+          </div>
         )}
         {page === 'upload' && (
           <UploadPage
@@ -443,25 +498,6 @@ export default function App() {
             }}
             onNavigate={setPage}
             credits={{ remaining: credits.total - credits.used }}
-          />
-        )}
-        {page === 'feed' && (
-          <SignalFeedPage
-            signals={signals}
-            profiles={profiles}
-            onNavigate={setPage}
-            onDismiss={handleDismissSignal}
-            targetDept={targetDept}
-            setTargetDept={setTargetDept}
-            targetSeniority={targetSeniority}
-            setTargetSeniority={setTargetSeniority}
-            trackerId={trackerId}
-            visitorLogs={visitorLogs}
-            onRefresh={refreshData}
-            onboardingSettings={onboardingSettings}
-            correlateCache={correlateCache}
-            setCorrelateCache={setCorrelateCache}
-            userId={session?.user?.id}
           />
         )}
         {page === 'profiles' && (
