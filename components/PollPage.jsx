@@ -6,7 +6,7 @@ import { MOCK_PROFILES, MOCK_POLL_LOG, MOCK_SIGNALS } from '../lib/mockData';
 import { identifyLinkedInUrlType } from '../lib/poller';
 import { supabase } from '../lib/supabaseClient';
 
-export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, onApiKeyChange, onProfilesUpdated, onSignalsDetected, onNavigate }) {
+export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, onApiKeyChange, onProfilesUpdated, onSignalsDetected, onNavigate, targetDept = 'Marketing', targetSeniority = 'VP' }) {
   const [apiKey, setApiKey] = useState(propApiKey || '');
   const [polling, setPolling] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -42,6 +42,203 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
     setLog(prev => [...prev, item]);
   };
 
+  const enrichCompanies = async (scrapedItems) => {
+    if (scrapedItems.length === 0) return [];
+    
+    appendLog({ type: 'info', text: '🔍 Starting deep B2B company research & enrichment...' });
+    
+    // Group scraped profiles by company name
+    const companyGroups = {};
+    scrapedItems.forEach(item => {
+      let company = item.snapshot.currentCompany;
+      if (!company || company === 'Unknown Company') {
+        company = item.profile.company;
+      }
+      if (!company || company === 'Unknown Company') return;
+      if (!companyGroups[company]) companyGroups[company] = [];
+      companyGroups[company].push(item);
+    });
+
+    const uniqueCompanies = Object.keys(companyGroups);
+    appendLog({ type: 'info', text: `Found ${uniqueCompanies.length} unique companies across ${scrapedItems.length} profiles.` });
+
+    const allExtSignals = [];
+
+    // Process companies in parallel with standard promises to ensure no skips and speed up execution
+    await Promise.all(uniqueCompanies.map(async (company, cIdx) => {
+      const profilesInCompany = companyGroups[company];
+      // Look for a profile with a valid company LinkedIn URL
+      const profileWithDomain = profilesInCompany.find(p => p.profile.companyLinkedinUrl) || profilesInCompany[0];
+
+      appendLog({ type: 'info', text: `🌐 Researching "${company}" (${cIdx + 1}/${uniqueCompanies.length})...` });
+
+      try {
+        const extRes = await fetch('/api/collectors/all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyName: company,
+            companyDomain: profileWithDomain.profile.companyLinkedinUrl ? '' : '',
+            profileUrl: profileWithDomain.profile.linkedinUrl,
+            profileName: profileWithDomain.profile.name
+          }),
+        });
+
+        if (!extRes.ok) {
+          throw new Error(`status ${extRes.status}`);
+        }
+
+        const extData = await extRes.json();
+        
+        if (extData) {
+          appendLog({ type: 'success', text: `✓ Completed research for "${extData.resolvedCompany || company}"` });
+
+          // Fetch alternative buying committee contacts using Exa
+          let alternateContacts = [];
+          try {
+            const bcRes = await fetch('/api/collectors/buying-committee', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ companyName: extData.resolvedCompany || company, department: targetDept, seniority: targetSeniority })
+            });
+            if (bcRes.ok) {
+              const bcData = await bcRes.json();
+              alternateContacts = bcData.contacts || [];
+              if (alternateContacts.length > 0) {
+                appendLog({ type: 'success', text: `  └ 👥 Discovered contacts: ${alternateContacts.length} people` });
+              }
+            }
+          } catch (bcErr) {
+            console.error(`Failed to fetch buying committee for ${company}:`, bcErr);
+          }
+          
+          // Update sitemap links, YouTube, job openings, etc. in snapshots
+          if (extData.sitemapLinks && extData.sitemapLinks.length > 0) {
+            appendLog({ type: 'success', text: `  └ 🌐 Mapped sitemaps: ${extData.sitemapLinks.length} URLs` });
+          }
+          if (extData.jobOpenings && extData.jobOpenings.length > 0) {
+            appendLog({ type: 'success', text: `  └ 💼 Mapped job openings: ${extData.jobOpenings.length} vacancies` });
+          }
+
+          // Build a temporary snapshot representation to send to the correlation engine
+          const tempSnapData = {
+            sitemapLinks: extData.sitemapLinks || [],
+            youtubeVideos: extData.youtubeVideos || [],
+            jobOpenings: extData.jobOpenings || [],
+            prMentions: extData.prMentions || [],
+            redditMentions: extData.redditMentions || [],
+            twitterMentions: extData.twitterMentions || [],
+            resolvedDomain: extData.resolvedDomain || '',
+            alternateContacts: alternateContacts,
+            ceoLinkedinUrl: extData.ceoLinkedinUrl || '',
+            twitterHandle: extData.twitterHandle || '',
+            g2Url: extData.g2Url || '',
+            capterraUrl: extData.capterraUrl || '',
+            g2Reviews: extData.g2Reviews || [],
+            capterraReviews: extData.capterraReviews || [],
+            posts: extData.companyPosts || [],
+            autoboundSignals: extData.autoboundSignals || [],
+            currentCompany: extData.resolvedCompany || company,
+          };
+
+          // Pre-fetch the strategic GTM investigator synthesis
+          let preFetchedSynthesis = null;
+          try {
+            appendLog({ type: 'info', text: `  └ 🧠 Pre-fetching strategic correlations & templates...` });
+            const corrRes = await fetch('/api/correlate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                companyName: extData.resolvedCompany || company,
+                domain: extData.resolvedDomain || '',
+                snapData: tempSnapData,
+                targetDept,
+                targetSeniority
+              })
+            });
+            if (corrRes.ok) {
+              preFetchedSynthesis = await corrRes.json();
+              appendLog({ type: 'success', text: `  └ 🧠 Synthesis pre-fetched successfully!` });
+            }
+          } catch (corrErr) {
+            console.error(`Failed to pre-fetch correlations for ${company}:`, corrErr);
+          }
+
+          // Save enrichment to Supabase for each profile in the group
+          for (const item of profilesInCompany) {
+            const { profile, snapshot, prev } = item;
+            
+            snapshot.sitemapLinks = extData.sitemapLinks || [];
+            snapshot.youtubeVideos = extData.youtubeVideos || [];
+            snapshot.jobOpenings = extData.jobOpenings || [];
+            snapshot.prMentions = extData.prMentions || [];
+            snapshot.redditMentions = extData.redditMentions || [];
+            snapshot.twitterMentions = extData.twitterMentions || [];
+            snapshot.resolvedDomain = extData.resolvedDomain || '';
+            snapshot.alternateContacts = alternateContacts;
+            snapshot.ceoLinkedinUrl = extData.ceoLinkedinUrl || '';
+            snapshot.twitterHandle = extData.twitterHandle || '';
+            snapshot.g2Url = extData.g2Url || '';
+            snapshot.capterraUrl = extData.capterraUrl || '';
+            snapshot.g2Reviews = extData.g2Reviews || [];
+            snapshot.capterraReviews = extData.capterraReviews || [];
+            snapshot.posts = extData.companyPosts || [];
+            snapshot.autoboundSignals = extData.autoboundSignals || [];
+            if (extData.resolvedCompany && extData.resolvedCompany !== 'Unknown') {
+              snapshot.currentCompany = extData.resolvedCompany;
+            }
+            if (preFetchedSynthesis) {
+              snapshot.synthesis = preFetchedSynthesis;
+            }
+
+            // Detect external signals
+            const extSignals = detectExternalSignals(profile, extData, prev);
+            if (extSignals.length > 0) {
+              extSignals.forEach(s => {
+                appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.source}` });
+              });
+              allExtSignals.push(...extSignals);
+              setSignalsFound(prevVal => prevVal + extSignals.length);
+            }
+
+            // Write enriched snapshot back to Supabase
+            const { data: currentData } = await supabase
+              .from('profiles')
+              .select('snapshots')
+              .eq('id', profile.id)
+              .single();
+
+            const currentSnapshots = (currentData && currentData.snapshots) || [];
+            const updatedSnapshots = [...currentSnapshots.slice(0, -1), snapshot];
+
+            const updatePayload = {
+              snapshots: updatedSnapshots,
+              status: 'active',
+              last_polled: new Date().toISOString()
+            };
+            if (!profile.companyLinkedinUrl && extData.companyLinkedinUrl) {
+              updatePayload.company_linkedin_url = extData.companyLinkedinUrl;
+              profile.companyLinkedinUrl = extData.companyLinkedinUrl;
+            }
+            if ((!profile.company || profile.company === 'Unknown') && extData.resolvedCompany && extData.resolvedCompany !== 'Unknown') {
+              updatePayload.company = extData.resolvedCompany;
+              profile.company = extData.resolvedCompany;
+            }
+            await supabase
+              .from('profiles')
+              .update(updatePayload)
+              .eq('id', profile.id);
+          }
+        }
+      } catch (err) {
+        appendLog({ type: 'info', text: `⚠️ Company research failed for "${company}": ${err.message}` });
+        console.error(`Company research failed for ${company}:`, err);
+      }
+    }));
+
+    return allExtSignals;
+  };
+
   const runMockPoll = async () => {
     setPolling(true);
     setDone(false);
@@ -51,17 +248,17 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
     appendLog({ type: 'info', text: `Starting demo poll for ${activeQueue.length} profiles...` });
 
     const allSignals = [];
+    const scrapedItems = [];
 
     for (let i = 0; i < activeQueue.length; i++) {
       const profile = activeQueue[i];
-      await sleep(300);
+      await sleep(150);
       appendLog({ type: 'info', text: `Polling LinkedIn baseline for ${profile.name}...` });
       
       const isComp = identifyLinkedInUrlType(profile.linkedinUrl) === 'company';
-      await sleep(150);
+      await sleep(100);
       appendLog({ type: 'success', text: `✓ ${profile.name} — baseline LinkedIn snapshot stored` });
       
-      // Seed a baseline snapshot structure if none exists
       const prev = (profile.snapshots && profile.snapshots[profile.snapshots.length - 1]) || {};
       const snapshot = {
         ...prev,
@@ -71,12 +268,10 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
       };
 
       if (isComp) {
-        // Generate mock company posts if empty
         if (!snapshot.posts || snapshot.posts.length === 0) {
           snapshot.posts = generateMockCompanyPosts(profile.name);
         }
       } else {
-        // Generate mock person posts & activity if empty
         if (!snapshot.recentPosts || snapshot.recentPosts.length === 0) {
           snapshot.recentPosts = generateMockPersonPosts(profile.name, profile.company);
         }
@@ -109,57 +304,17 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
         setSignalsFound(prevVal => prevVal + 1);
       }
 
-      // Fetch external feeds in parallel (works in demo mode too!)
-      try {
-        appendLog({ type: 'info', text: `🔍 Querying Google News, Reddit, Twitter, and YouTube for "${profile.company || profile.name}"...` });
-        const extRes = await fetch('/api/collectors/all', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyName: profile.company || profile.name,
-            companyDomain: profile.companyLinkedinUrl ? '' : ''
-          }),
+      // Run baseline LinkedIn signal detection
+      const linkedinSignals = detectSignals(profile, prev, snapshot);
+      if (linkedinSignals.length > 0) {
+        linkedinSignals.forEach(s => {
+          appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.profile}` });
         });
-
-        if (extRes.ok) {
-          const extData = await extRes.json();
-          
-          if (extData) {
-            snapshot.sitemapLinks = extData.sitemapLinks || [];
-            snapshot.youtubeVideos = extData.youtubeVideos || [];
-            snapshot.jobOpenings = extData.jobOpenings || [];
-            snapshot.prMentions = extData.prMentions || [];
-            snapshot.redditMentions = extData.redditMentions || [];
-            snapshot.twitterMentions = extData.twitterMentions || [];
-            snapshot.resolvedDomain = extData.resolvedDomain || '';
-
-            if (extData.sitemapLinks && extData.sitemapLinks.length > 0) {
-              appendLog({ type: 'success', text: `🌐 Firecrawl: sitemap mapped ${extData.sitemapLinks.length} URLs` });
-            }
-
-            if (extData.youtubeVideos && extData.youtubeVideos.length > 0) {
-              appendLog({ type: 'success', text: `🎥 YouTube Feed: resolved channel and fetched latest videos` });
-            }
-
-            if (extData.jobOpenings && extData.jobOpenings.length > 0) {
-              appendLog({ type: 'success', text: `💼 Jobs: found ${extData.jobOpenings.length} active job vacancies` });
-            }
-          }
-
-          const extSignals = detectExternalSignals(profile, extData, prev);
-          if (extSignals.length > 0) {
-            extSignals.forEach(s => {
-              appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.source}` });
-            });
-            allSignals.push(...extSignals);
-            setSignalsFound(prevVal => prevVal + extSignals.length);
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching external collectors:', err);
+        allSignals.push(...linkedinSignals);
+        setSignalsFound(prevVal => prevVal + linkedinSignals.length);
       }
 
-      // Update the profile record in Supabase with the new snapshot
+      // Update the profile record in Supabase with the basic snapshot (Active)
       try {
         const currentSnapshots = profile.snapshots || [];
         const { error } = await supabase
@@ -171,6 +326,8 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
           })
           .eq('id', profile.id);
         if (error) throw error;
+
+        scrapedItems.push({ profile, snapshot, prev });
       } catch (err) {
         console.error("Error updating profile status in Supabase:", err);
       }
@@ -178,6 +335,10 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
       const pct = Math.round(((i + 1) / activeQueue.length) * 100);
       setProgress(pct);
     }
+
+    // Run deferred external enrichment for unique companies
+    const extSignals = await enrichCompanies(scrapedItems);
+    allSignals.push(...extSignals);
 
     if (onSignalsDetected) {
       onSignalsDetected(rankSignals(allSignals));
@@ -199,6 +360,7 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
     const { pollProfilesBatch } = await import('../lib/poller');
 
     const allSignals = [];
+    const scrapedItems = [];
 
     const generator = pollProfilesBatch(activeQueue, apiKey, { delayMs: 600 });
 
@@ -223,60 +385,14 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
             allSignals.push(...linkedinSignals);
             setSignalsFound(prevVal => prevVal + linkedinSignals.length);
           } else {
-            appendLog({ type: 'success', text: `✓ ${update.profile?.name} — LinkedIn baseline checked` });
-          }
-
-          // Fetch external brand mentions & sitemaps (Google News, Reddit, Twitter, YouTube, Firecrawl)
-          try {
-            appendLog({ type: 'info', text: `🔍 Querying Google News, Reddit, Twitter, and YouTube for "${update.profile?.company || update.profile?.name}"...` });
-            const extRes = await fetch('/api/collectors/all', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                companyName: update.profile?.company || update.profile?.name,
-                companyDomain: update.profile?.companyLinkedinUrl ? '' : ''
-              }),
-            });
-
-            if (extRes.ok) {
-              const extData = await extRes.json();
-              
-              if (extData) {
-                snapshot.sitemapLinks = extData.sitemapLinks || [];
-                snapshot.youtubeVideos = extData.youtubeVideos || [];
-                snapshot.jobOpenings = extData.jobOpenings || [];
-                snapshot.prMentions = extData.prMentions || [];
-                snapshot.redditMentions = extData.redditMentions || [];
-                snapshot.twitterMentions = extData.twitterMentions || [];
-                snapshot.resolvedDomain = extData.resolvedDomain || '';
-
-                if (extData.sitemapLinks && extData.sitemapLinks.length > 0) {
-                  appendLog({ type: 'success', text: `🌐 Firecrawl: sitemap mapped ${extData.sitemapLinks.length} URLs` });
-                }
-
-                if (extData.youtubeVideos && extData.youtubeVideos.length > 0) {
-                  appendLog({ type: 'success', text: `🎥 YouTube Feed: resolved channel and fetched latest videos` });
-                }
-
-                if (extData.jobOpenings && extData.jobOpenings.length > 0) {
-                  appendLog({ type: 'success', text: `💼 Jobs: found ${extData.jobOpenings.length} active job vacancies` });
-                }
-              }
-
-              const extSignals = detectExternalSignals(update.profile, extData, prev);
-              if (extSignals.length > 0) {
-                extSignals.forEach(s => {
-                  appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.source}` });
-                });
-                allSignals.push(...extSignals);
-                setSignalsFound(prevVal => prevVal + extSignals.length);
-              }
+            if (snapshot.isPrivateProfile) {
+              appendLog({ type: 'info', text: `🔒 ${update.profile?.name} — Profile is private (monitoring company instead)` });
+            } else {
+              appendLog({ type: 'success', text: `✓ ${update.profile?.name} — LinkedIn baseline checked` });
             }
-          } catch (err) {
-            console.error('Error fetching external collectors:', err);
           }
 
-          // Update the profile in Supabase
+          // Update the profile in Supabase to active immediately
           try {
             const currentSnapshots = update.profile?.snapshots || [];
             const { error } = await supabase
@@ -288,6 +404,8 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
               })
               .eq('id', update.profile?.id);
             if (error) throw error;
+
+            scrapedItems.push({ profile: update.profile, snapshot, prev });
           } catch (err) {
             console.error("Error updating profile status in Supabase:", err);
           }
@@ -299,10 +417,16 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
       } else if (update.type === 'error') {
         appendLog({ type: 'info', text: `⚠ ${update.profileName} — ${update.error}` });
       } else if (update.type === 'done') {
-        appendLog({ type: 'signal', text: `✅ Poll complete — ${allSignals.length} total signals detected` });
-        if (onSignalsDetected) onSignalsDetected(rankSignals(allSignals));
+        appendLog({ type: 'info', text: `LinkedIn baseline check complete. Starting company enrichment...` });
       }
     }
+
+    // Run deferred external enrichment for unique companies
+    const extSignals = await enrichCompanies(scrapedItems);
+    allSignals.push(...extSignals);
+
+    appendLog({ type: 'signal', text: `✅ Poll complete — ${allSignals.length} total signals detected` });
+    if (onSignalsDetected) onSignalsDetected(rankSignals(allSignals));
 
     setDone(true);
     setPolling(false);

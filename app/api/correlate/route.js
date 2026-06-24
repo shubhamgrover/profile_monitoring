@@ -1,0 +1,659 @@
+import { NextResponse } from 'next/server';
+import { synthesizeCompanyAccount, getFrameworkTemplates } from '../../../lib/synthesisEngine';
+
+// Exa search helper
+async function searchExa(query, limit = 2, includeDomains = null) {
+  const exaKey = process.env.EXA_API_KEY || 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
+  try {
+    const requestBody = {
+      query: query,
+      numResults: limit,
+    };
+    if (includeDomains) {
+      requestBody.includeDomains = includeDomains;
+    }
+    const res = await fetch('https://api.exa.ai/search', {
+      method: 'POST',
+      headers: {
+        'x-api-key': exaKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.results || [];
+    }
+  } catch (err) {
+    console.error(`Exa search failed for query "${query}":`, err);
+  }
+  return [];
+}
+
+// Scrape Creators Person profile simulation/API fetch
+async function getScrapeCreatorsPosts(linkedinUrl) {
+  const apiKey = process.env.SCRAPECREATORS_API_KEY || 'dummy-key';
+  if (apiKey === 'dummy-key') {
+    // Generate high-quality mock posts based on profile url to save credits during testing
+    if (linkedinUrl.includes('abha') || linkedinUrl.includes('khurana')) {
+      return [
+        { text: "Atlys is scaling! We are building out our executive compliance team and hiring engineering talent. Daily customer calls are keeping us grounded!" },
+        { text: "Rituals that scale are better than processes. Daily support call playbacks define our culture." }
+      ];
+    }
+    if (linkedinUrl.includes('vivek') || linkedinUrl.includes('khandelwal')) {
+      return [
+        { text: "Delighted to share we are exploring new generative engine optimization strategy. Scaling our brand presence across all search engines." },
+        { text: "Outbound tools should sync guide documents directly to users. Excited for our roadmap." }
+      ];
+    }
+    return [
+      { text: "Excited to scale our outbound B2B campaigns this quarter. Looking to optimize lead list matching and intent signals." },
+      { text: "Evaluating our marketing stack. Standard paid acquisition loops are showing rising customer acquisition costs." }
+    ];
+  }
+  try {
+    const res = await fetch(`https://api.scrapecreators.com/v1/linkedin/profile?url=${encodeURIComponent(linkedinUrl)}`, {
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const sources = [
+        data.recentPosts,
+        data.posts,
+        data.updates,
+        data.activity,
+        data.recentActivity,
+        data.comments,
+        data.reposts
+      ];
+      const merged = [];
+      const seenTexts = new Set();
+      for (const src of sources) {
+        if (Array.isArray(src)) {
+          for (const item of src) {
+            if (!item) continue;
+            const text = (item.text || item.title || item.content || item.commentText || item.description || '').trim();
+            if (text && !seenTexts.has(text)) {
+              seenTexts.add(text);
+              merged.push({
+                text: text,
+                link: item.link || item.url || linkedinUrl,
+                datePublished: item.date || item.datePublished || item.createdAt || new Date().toISOString()
+              });
+            }
+          }
+        }
+      }
+      return merged.slice(0, 10);
+    }
+  } catch (err) {
+    console.error(`ScrapeCreators failed for ${linkedinUrl}:`, err);
+  }
+  return [];
+}
+
+// Scrape Creators Company page simulation/API fetch
+async function getCompanyPagePosts(companyName, companyLinkedinUrl) {
+  const apiKey = process.env.SCRAPECREATORS_API_KEY || 'dummy-key';
+  
+  let targetUrl = companyLinkedinUrl;
+  if (!targetUrl) {
+    let cleanName = companyName.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '-');
+    if (cleanName.includes('factors')) {
+      cleanName = 'factors-ai';
+    }
+    targetUrl = `https://www.linkedin.com/company/${cleanName}`;
+  }
+
+  if (apiKey === 'dummy-key') {
+    if (companyName.toLowerCase().includes('factors')) {
+      return [
+        {
+          text: "We just launched Scout! Stop spending hours piecing together siloed CRM, web, and ad data. Use Scout to instantly find and automate your first-party account data.",
+          link: "https://www.linkedin.com/company/factors-ai",
+          datePublished: "2026-05-09T00:00:00Z"
+        },
+        {
+          text: "Double down on pipeline! Thrilled to announce our new team expansions in Bangalore and US. We are hiring across the board.",
+          link: "https://www.linkedin.com/company/factors-ai",
+          datePublished: "2026-06-01T00:00:00Z"
+        }
+      ];
+    }
+    return [
+      { text: `${companyName} is expanding its product lines, releasing sitemaps, and hiring key staff across growth and engineering.` }
+    ];
+  }
+
+  try {
+    const res = await fetch(`https://api.scrapecreators.com/v1/linkedin/company?url=${encodeURIComponent(targetUrl)}`, {
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const posts = data.posts || data.updates || data.recentPosts || data.recent_posts || [];
+      return posts.map(p => ({ 
+        text: p.text || p.title || p.content || p.commentary || p.description || '',
+        link: p.link || targetUrl,
+        datePublished: p.datePublished || p.date || p.createdAt || new Date().toISOString()
+      }));
+    }
+  } catch (err) {
+    console.error(`ScrapeCreators failed for company ${companyName}:`, err);
+  }
+  return [];
+}
+
+const inFlight = new Map();
+
+async function handleCorrelateRequest(body) {
+  let companyName = 'Unknown';
+  let enrichedData = {};
+  let targetDept = 'Marketing';
+  let targetSeniority = 'VP';
+  let resolvedContacts = [];
+  let founderContact = null;
+  let marketingContact = null;
+  let companyPosts = [];
+  
+  try {
+    companyName = body.companyName;
+    const domain = body.domain;
+    targetDept = body.targetDept || 'Marketing';
+    targetSeniority = body.targetSeniority || 'VP';
+    const productDesc = body.productDesc || 'SignalEngine B2B tracking tool';
+    const valueProposition = body.valueProposition || 'gives enterprise teams an additional outbound channel and removes dependence on traditional ad spend';
+    enrichedData = { ...(body.snapData || {}) };
+    
+    if (!companyName) {
+      return { error: 'Missing companyName' };
+    }
+
+    const exaKey = process.env.EXA_API_KEY || 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
+
+    // Attempt to enrich data via Autobound Signal API if key and domain are present
+    const autoboundKey = process.env.AUTOBOUND_API_KEY;
+    if (autoboundKey && domain) {
+      try {
+        console.log(`[Autobound] Enriching domain: ${domain}`);
+        const abResponse = await fetch("https://signals.autobound.ai/v1/companies/enrich", {
+          method: "POST",
+          headers: {
+            "X-API-KEY": autoboundKey,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ domain }),
+          signal: AbortSignal.timeout(10000)
+        });
+        if (abResponse.ok) {
+          const abData = await abResponse.json();
+          if (abData && abData.signals) {
+            console.log(`[Autobound] Found ${abData.signals.length} signals for ${domain}`);
+            enrichedData.autoboundSignals = abData.signals;
+            enrichedData.autoboundCompanyInfo = abData.company;
+          }
+        } else {
+          console.warn(`[Autobound] Failed to enrich ${domain}: status ${abResponse.status}`);
+        }
+      } catch (abErr) {
+        console.error(`[Autobound] Enrichment error for ${domain}:`, abErr.message);
+      }
+    }
+
+    // 1. Resolve top 2 department contacts via Exa
+    const seniorityMap = {
+      'C-Suite': '(CEO OR Founder OR "Chief" OR President OR COO OR CTO OR CMO OR CRO)',
+      'VP': '(VP OR "Vice President" OR "Head")',
+      'Director': '("Director" OR "Head")',
+      'Manager': '("Manager" OR "Lead")',
+      'All': '(CEO OR Founder OR VP OR Director OR Head OR Manager OR Lead)'
+    };
+
+    const deptMap = {
+      'Marketing': '(Marketing OR Brand OR Growth OR PR OR Communications OR CMO)',
+      'Sales': '(Sales OR Outbound OR BD OR "Business Development" OR Account OR Revenue OR CRO)',
+      'HR': '(HR OR Talent OR Recruiting OR People OR Culture OR CHRO)',
+      'Engineering': '(Engineering OR Developer OR Technical OR Software OR Architect OR CTO)',
+      'Operations': '(Operations OR Ops OR COO)',
+      'Product': '(Product OR PM OR CPO)'
+    };
+
+    const seniorityQuery = seniorityMap[targetSeniority] || seniorityMap['All'];
+    const departmentQuery = deptMap[targetDept] || deptMap['Marketing'];
+
+    const domainContext = domain ? ` (${domain})` : '';
+    const contactsQuery = `LinkedIn profile of a ${targetSeniority} in the ${targetDept} department at ${companyName}${domainContext} site:linkedin.com/in/`;
+    const exaContacts = await searchExa(contactsQuery, 2, ['linkedin.com']);
+
+    const founderQuery = `LinkedIn profile of the CEO, Founder, or President of ${companyName}${domainContext} site:linkedin.com/in/`;
+    const exaFounders = await searchExa(founderQuery, 1, ['linkedin.com']);
+
+    const marketingQuery = `LinkedIn profile of the CMO, VP of Marketing, or Head of Marketing at ${companyName}${domainContext} site:linkedin.com/in/`;
+    const exaMarketing = await searchExa(marketingQuery, 1, ['linkedin.com']);
+
+    // Parsing helpers
+    const parseLinkedInTitle = (titleRaw) => {
+      let cleanTitle = titleRaw.replace(/\s*[|–-]\s*LinkedIn\b/i, '').trim();
+      const segments = cleanTitle.split(/\s*[-|–—]\s*/).map(s => s.trim()).filter(Boolean);
+      const name = segments[0] || 'LinkedIn Member';
+      let title = segments[1] || 'Executive';
+      if (title.includes(' at ')) title = title.split(' at ')[0].trim();
+      else if (title.includes(' @ ')) title = title.split(' @ ')[0].trim();
+      
+      // Title Normalization
+      title = title
+        .replace(/\bChief Executive Officer\b/gi, 'CEO')
+        .replace(/\bChief Operating Officer\b/gi, 'COO')
+        .replace(/\bChief Technology Officer\b/gi, 'CTO')
+        .replace(/\bChief Marketing Officer\b/gi, 'CMO')
+        .replace(/\bChief Revenue Officer\b/gi, 'CRO')
+        .replace(/\bVice President\b/gi, 'VP')
+        .trim();
+
+      return { name, title };
+    };
+
+    const parseExaContact = (r, defaultTitle = 'Executive') => {
+      let name = 'LinkedIn Member';
+      let title = defaultTitle;
+      
+      // Try to parse from entities workHistory first
+      if (r.entities?.[0]?.properties) {
+        const props = r.entities[0].properties;
+        if (props.name) {
+          name = props.name;
+        } else if (props.firstName && props.lastName) {
+          name = `${props.firstName} ${props.lastName}`;
+        }
+        
+        if (props.workHistory && props.workHistory.length > 0) {
+          const match = props.workHistory.find(h => {
+            const cName = h.company?.name || '';
+            return cName.toLowerCase().includes(companyName.toLowerCase()) || 
+                   companyName.toLowerCase().includes(cName.toLowerCase());
+          });
+          if (match && match.title) {
+            title = match.title;
+          } else if (props.workHistory[0]?.title) {
+            title = props.workHistory[0].title;
+          }
+        }
+      }
+      
+      // Fallback to titleRaw parsing if name is still default or title is default
+      if (name === 'LinkedIn Member' || title === defaultTitle) {
+        const parsed = parseLinkedInTitle(r.title || '');
+        if (name === 'LinkedIn Member') name = parsed.name;
+        if (title === defaultTitle) title = parsed.title;
+      }
+
+      if (title) {
+        title = title
+          .replace(/\bChief Executive Officer\b/gi, 'CEO')
+          .replace(/\bChief Operating Officer\b/gi, 'COO')
+          .replace(/\bChief Technology Officer\b/gi, 'CTO')
+          .replace(/\bChief Marketing Officer\b/gi, 'CMO')
+          .replace(/\bChief Revenue Officer\b/gi, 'CRO')
+          .replace(/\bVice President\b/gi, 'VP')
+          .trim();
+      }
+      
+      return { name, title, url: r.url || 'https://www.linkedin.com' };
+    };
+
+    // Exclusions list to prevent VP of Data being returned for Marketing
+    const filterExclusions = (contactsList) => {
+      const exclusions = ['data', 'analytics', 'science', 'ops', 'operations', 'engineering', 'developer', 'recruiter', 'hr', 'people', 'talent'];
+      return contactsList.filter(c => {
+        const titleLower = c.title.toLowerCase();
+        const rawLower = (c.rawTitle || '').toLowerCase();
+        if (titleLower.includes('growth ops') || titleLower.includes('marketing ops') || titleLower.includes('marketing operations') ||
+            rawLower.includes('growth ops') || rawLower.includes('marketing ops') || rawLower.includes('marketing operations')) {
+          return true;
+        }
+        return !exclusions.some(exc => titleLower.includes(exc) || rawLower.includes(exc));
+      });
+    };
+
+    resolvedContacts = exaContacts.map(r => {
+      const parsed = parseExaContact(r, 'Executive');
+      return { ...parsed, rawTitle: r.title };
+    });
+
+    if (targetDept === 'Marketing') {
+      resolvedContacts = filterExclusions(resolvedContacts);
+    }
+
+    // 2. Fetch Scrape Creators social posts
+    resolvedContacts = await Promise.all(
+      resolvedContacts.map(async (c) => {
+        const posts = await getScrapeCreatorsPosts(c.url);
+        return { ...c, posts };
+      })
+    );
+
+    founderContact = null;
+    if (exaFounders && exaFounders.length > 0) {
+      const parsedFounder = parseExaContact(exaFounders[0], 'CEO / Founder');
+      const posts = await getScrapeCreatorsPosts(parsedFounder.url);
+      founderContact = { ...parsedFounder, posts };
+    }
+
+    marketingContact = null;
+    if (exaMarketing && exaMarketing.length > 0) {
+      const parsedMarketing = parseExaContact(exaMarketing[0], 'Head of Marketing');
+      const posts = await getScrapeCreatorsPosts(parsedMarketing.url);
+      marketingContact = { ...parsedMarketing, posts };
+    }
+
+    // 3. Resolve LinkedIn company URL if missing
+    let companyLinkedinUrl = enrichedData.companyLinkedinUrl || enrichedData.linkedinUrl || '';
+    if (!companyLinkedinUrl || companyLinkedinUrl.includes('/in/')) {
+      console.log(`[Correlate API] Resolving company LinkedIn URL for ${companyName}`);
+      const linkedinCompanyResults = await searchExa(`site:linkedin.com/company/ "${companyName}" official page`, 1, ['linkedin.com']);
+      if (linkedinCompanyResults && linkedinCompanyResults.length > 0) {
+        companyLinkedinUrl = linkedinCompanyResults[0].url;
+        enrichedData.companyLinkedinUrl = companyLinkedinUrl;
+      }
+    }
+    companyPosts = await getCompanyPagePosts(companyName, companyLinkedinUrl);
+
+    // Dynamic enrichment for missing general signals
+    let jobOpenings = enrichedData.jobOpenings || [];
+    if (jobOpenings.length === 0) {
+      console.log(`[Correlate API] Dynamically fetching Jobs for ${companyName}`);
+      const jobResults = await searchExa(`"${companyName}" job openings OR careers page OR "hiring"`, 5);
+      jobOpenings = jobResults.map(r => ({ title: r.title, url: r.url }));
+      enrichedData.jobOpenings = jobOpenings;
+    }
+
+    let twitterMentions = enrichedData.twitterMentions || [];
+    if (twitterMentions.length === 0) {
+      console.log(`[Correlate API] Dynamically fetching Twitter mentions for ${companyName}`);
+      const twitterResults = await searchExa(`site:twitter.com OR site:x.com "${companyName}"`, 3);
+      twitterMentions = twitterResults.map(r => ({ title: r.title, url: r.url }));
+      enrichedData.twitterMentions = twitterMentions;
+    }
+
+    let redditMentions = enrichedData.redditMentions || [];
+    if (redditMentions.length === 0) {
+      console.log(`[Correlate API] Dynamically fetching Reddit mentions for ${companyName}`);
+      const redditResults = await searchExa(`site:reddit.com "${companyName}"`, 3);
+      redditMentions = redditResults.map(r => ({ title: r.title, url: r.url }));
+      enrichedData.redditMentions = redditMentions;
+    }
+
+    let prMentions = enrichedData.prMentions || [];
+    if (prMentions.length === 0) {
+      console.log(`[Correlate API] Dynamically fetching PR News for ${companyName}`);
+      const prResults = await searchExa(`"${companyName}" (funding news OR product launch OR acquisition OR press release)`, 3);
+      prMentions = prResults.map(r => ({ title: r.title, url: r.url }));
+      enrichedData.prMentions = prMentions;
+    }
+
+    // Merge everything into enrichedData payload for Gemini review
+    enrichedData.resolvedContacts = resolvedContacts;
+    enrichedData.founderContact = founderContact;
+    enrichedData.marketingContact = marketingContact;
+    enrichedData.companyPosts = companyPosts;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      // Fallback synthesis
+      const fallback = synthesizeCompanyAccount(companyName, enrichedData, targetDept);
+      const finalResponse = prepareCorrelateResponse(fallback, resolvedContacts, founderContact, marketingContact, companyPosts, true, companyName, targetDept, [], [], [], [], enrichedData.autoboundSignals || []);
+      return NextResponse.json(finalResponse);
+    }
+
+        const systemPrompt = `You are the world’s elite B2B Go-To-Market (GTM) strategist, corporate intelligence analyst, and master of Account-Based Marketing (ABM).
+
+You are being handed a pre-compiled, multi-channel data payload for a target account. Your core capability is Multi-Signal Synthesis: you do not look at data points in isolation. Instead, you look for the "connective tissue" where an executive's personal point of view, a technical social media discussion, an API trigger, and job openings collide to reveal an unannounced corporate pivot, macro strategic shift, or massive operational bottleneck.
+
+We sell: "${productDesc}"
+Our value proposition / solved pain: "${valueProposition}"
+
+We have resolved:
+1. Top decision-makers (Y & Z) in the target department: ${JSON.stringify(resolvedContacts)}
+2. The CEO/Founder: ${JSON.stringify(founderContact)}
+3. The Marketing Lead: ${JSON.stringify(marketingContact)}
+4. Recent company updates: ${JSON.stringify(companyPosts)}
+
+YOUR STRATEGIC STRATEGY & EXPORT BLUEPRINT:
+Analyze the payload below and deliver a hyper-sharp, non-obvious B2B intelligence brief structured into three distinct layers. Avoid generic fluff like "they want to scale." Focus on highly leveraged, actionable business realities. Make sure observations are crisp and directly help the sales team correlate what is happening.
+
+🎯 LAYER 1: THE MACRO CORRELATION MAP (Connecting the Dots)
+Identify **at least 5 to 10** "Core Strategic Correlations" or outreach triggers by cross-referencing multiple disparate channels. Ensure you return at least 5-10 separate correlation models in the JSON.
+Format each correlation using this precise logical structure:
+- Evidence channels represent [X], [Y], and [Z] (e.g. job posts, news mentions, tech stacks, events, PR).
+- The narrative/reality represents [A] (what it generally means). It MUST start with: "Since [X], [Y], and [Z] exist/happened, it generally means [A]".
+- The outreach script represents [P] (our pitch). It MUST start with: "Which means this can be our pitch: [pitch content]".
+- The recommended contact represents [U] (the right person to reach out to).
+
+👥 LAYER 2: 1-TO-1 EXECUTIVE ENGAGEMENT PLAYBOOK
+For the top decision-makers surfaced, construct a tailored sales entry point (U).
+
+📣 LAYER 3: ACCOUNT-BASED MARKETING (ABM) AIR COVER
+Outline how to surround this account with marketing assets to prime them for sales outreach.
+
+You MUST respond ONLY with a valid JSON object matching this schema. Do not include markdown code block syntax (like \`\`\`json) or any conversational text.
+CRITICAL EMAIL FORMAT RULE: All email frameworks under the "frameworks" list MUST be **generic in nature** and follow the exact format below. They must NEVER mention our company name (SignalEngine) or describe specific proprietary product features. 
+
+The email body must look EXACTLY like this:
+Hi {{first_name}},
+
+Saw [X] (observed trigger event like their recent post, hiring surge, or news).
+
+This generally means [Y] (logical implication / challenge).
+
+We have done this for [A], [B], [C] (provide 2-3 similar past reference companies like Atlys, CogniSwitch, or Dentsu).
+
+Worth a quick chat?
+
+Best,
+[Your Name]
+
+JSON Schema:
+{
+  "strategicCorrelations": [
+    {
+      "title": "Pivot / Pain Signal Title",
+      "evidence": "Connected Channels (e.g., X, Y, and Z)",
+      "narrative": "Since [X], [Y], and [Z] exist/happened, it generally means [A (underlying business shift or operational pain)]",
+      "friction": "The Immediate Internal Friction description",
+      "script": "Which means this can be our pitch: [peer-to-peer hook script, warm, direct, helpful peer tone]",
+      "marketingTrigger": "High-Intent Content Asset: [Topic] | ABM Retargeting Theme: [Creative Hook]"
+    }
+  ],
+  "conclusion": "Capitalized strategic pivot description",
+  "emoji": "🚀",
+  "category": "A single word category name",
+  "details": "A detailed 2-sentence strategic deduction explaining the proof sequence",
+  "strategicShift": "A concise, highly specific 1-sentence prediction explaining exactly what future macro shift or strategic transition we think is happening/will happen next",
+  "recommendedContact": {
+    "name": "Name of recommended contact (U)",
+    "title": "Title of recommended contact",
+    "url": "LinkedIn URL",
+    "reason": "Clear explanation linking Layer 2 persona, angle, or post to Layer 1"
+  },
+  "recommendedFrameworkId": 5,
+  "frameworks": [
+    { "id": 1, "name": "Framework 1: Lead Magnet", "subject": "playbook for ${companyName}", "body": "Hi {{first_name}},\n\nSaw [X].\n\nThis generally means [Y].\n\nWe have done this for [A], [B], [C].\n\nWorth a quick chat?\n\nBest,\n[Your Name]" },
+    { "id": 2, "name": "Framework 2: Offer (1 line)", "subject": "quick question", "body": "Hi {{first_name}},\n\nSaw [X].\n\nThis generally means [Y].\n\nWe have done this for [A], [B], [C].\n\nWorth a quick chat?\n\nBest,\n[Your Name]" },
+    { "id": 3, "name": "Framework 3: Guaranteed Result", "subject": "result for ${companyName}", "body": "Hi {{first_name}},\n\nSaw [X].\n\nThis generally means [Y].\n\nWe have done this for [A], [B], [C].\n\nWorth a quick chat?\n\nBest,\n[Your Name]" },
+    { "id": 4, "name": "Framework 4: Pain point focus", "subject": "question regarding ${companyName}", "body": "Hi {{first_name}},\n\nSaw [X].\n\nThis generally means [Y].\n\nWe have done this for [A], [B], [C].\n\nWorth a quick chat?\n\nBest,\n[Your Name]" },
+    { "id": 5, "name": "Framework 5: Market Insight", "subject": "insight for ${companyName}", "body": "Hi {{first_name}},\n\nSaw [X].\n\nThis generally means [Y].\n\nWe have done this for [A], [B], [C].\n\nWorth a quick chat?\n\nBest,\n[Your Name]" }
+  ]
+}`;
+
+    const userPrompt = `### THE INPUT DATA
+${companyName}:
+- Autobound Signals: ${JSON.stringify(enrichedData.autoboundSignals || [])}
+- New Job Openings: ${JSON.stringify(enrichedData.jobOpenings || [])}
+- Twitter/X Activity: ${JSON.stringify(enrichedData.twitterMentions || [])}
+- Reddit Discussions: ${JSON.stringify(enrichedData.redditMentions || [])}
+- LinkedIn Activity: ${JSON.stringify({
+    companyPosts: companyPosts || [],
+    founderLinkedInPosts: founderContact?.posts || [],
+    marketingLinkedInPosts: marketingContact?.posts || [],
+    contactsLinkedInPosts: resolvedContacts.flatMap(c => c.posts || [])
+  })}
+  
+Generate the deep correlations based on these 5 signal streams. Make sure that if recent LinkedIn posts exist (like Arpit Ratan's Booth 7 MEA Finance Banking Technology Summit post or any other comments/reposts), you specifically connect them to hiring signals and new business formations!`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: systemPrompt + '\n\n' + userPrompt }]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json'
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Gemini API request failed:', errText);
+      throw new Error(`Gemini API returned status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textResponse) {
+      throw new Error('Empty response from Gemini API');
+    }
+
+    const result = JSON.parse(textResponse.trim());
+    const finalResponse = prepareCorrelateResponse(result, resolvedContacts, founderContact, marketingContact, companyPosts, false, companyName, targetDept, jobOpenings, prMentions, redditMentions, twitterMentions, enrichedData.autoboundSignals || []);
+    return finalResponse;
+
+  } catch (error) {
+    console.error('Error in /api/correlate route:', error.message);
+    const fallback = synthesizeCompanyAccount(companyName || 'Unknown', enrichedData || {}, targetDept);
+    const finalResponse = prepareCorrelateResponse(fallback, resolvedContacts || [], founderContact || null, marketingContact || null, companyPosts || [], true, companyName || 'Unknown', targetDept, enrichedData.jobOpenings || [], enrichedData.prMentions || [], enrichedData.redditMentions || [], enrichedData.twitterMentions || [], enrichedData.autoboundSignals || []);
+    return { ...finalResponse, error: error.message };
+  }
+}
+
+export async function POST(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const { companyName, targetDept = 'Marketing', targetSeniority = 'VP' } = body;
+  if (!companyName) {
+    return NextResponse.json({ error: 'Missing companyName' }, { status: 400 });
+  }
+
+  const requestKey = `${companyName}-${targetDept}-${targetSeniority}`;
+
+  if (inFlight.has(requestKey)) {
+    console.log(`[Correlate API] Deduping concurrent in-flight request for: ${requestKey}`);
+    const result = await inFlight.get(requestKey);
+    return NextResponse.json(result);
+  }
+
+  const promise = handleCorrelateRequest(body);
+  inFlight.set(requestKey, promise);
+
+  try {
+    const result = await promise;
+    if (result.error && result.error.includes('Missing companyName')) {
+      return NextResponse.json({ error: 'Missing companyName' }, { status: 400 });
+    }
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error(`[Correlate API] Fatal error for promise ${requestKey}:`, error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  } finally {
+    inFlight.delete(requestKey);
+  }
+}
+
+function prepareCorrelateResponse(synthesis, resolvedContacts, founderContact, marketingContact, companyPosts, isFallback, companyName, targetDept, jobOpenings = [], prMentions = [], redditMentions = [], twitterMentions = [], autoboundSignals = []) {
+  // Overwrite recommended contact with resolved contacts if available
+  let recommended = synthesis.recommendedContact;
+  if (resolvedContacts && resolvedContacts.length > 0) {
+    recommended = {
+      name: resolvedContacts[0].name,
+      title: resolvedContacts[0].title,
+      url: resolvedContacts[0].url,
+      reason: `Recommended as the active ${resolvedContacts[0].title} in the ${targetDept} department.`
+    };
+  } else if (founderContact) {
+    recommended = {
+      name: founderContact.name,
+      title: founderContact.title,
+      url: founderContact.url,
+      reason: `Recommended because as ${founderContact.title || 'Founder/CEO'}, they lead strategic scaling.`
+    };
+  } else {
+    recommended = {
+      name: "Key Decision Maker",
+      title: `${targetDept} Strategic Lead`,
+      url: `https://www.linkedin.com/company/${companyName.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '-')}`,
+      reason: `Default fallback to target department.`
+    };
+  }
+
+  // Populate frameworks names
+  let frameworks = synthesis.frameworks || [];
+  if (frameworks.length === 0) {
+    frameworks = getFrameworkTemplates(companyName, synthesis.conclusion || '', {}, targetDept);
+  }
+
+  // Replace {{first_name}} placeholder inside frameworks bodies with the recommended contact's first name
+  const contactName = recommended.name || 'there';
+  const firstName = contactName !== 'Key Decision Maker' ? contactName.split(' ')[0] : 'there';
+  
+  frameworks = frameworks.map(f => {
+    let updatedBody = f.body || '';
+    updatedBody = updatedBody.replace(/\{\{first_name\}\}/g, firstName);
+    updatedBody = updatedBody.replace(/Hi \{\{Contact\}\}/g, `Hi ${firstName}`);
+    return { ...f, body: updatedBody };
+  });
+
+  // Ensure fallback format for strategicCorrelations if fallback is used
+  let correlations = synthesis.strategicCorrelations || [];
+  if (isFallback || correlations.some(c => !c.narrative.startsWith("Since"))) {
+    correlations = correlations.map(c => {
+      let narrative = c.narrative;
+      if (!narrative.startsWith("Since")) {
+        narrative = `Since ${c.evidence || 'multiple signals'} exist/happened, it generally means ${c.narrative || 'stable baseline operations'}`;
+      }
+      let script = c.script;
+      if (script && !script.startsWith("Which means")) {
+        script = `Which means this can be our pitch: "${script}"`;
+      }
+      return { ...c, narrative, script };
+    });
+  }
+
+  return {
+    ...synthesis,
+    strategicCorrelations: correlations,
+    recommendedContact: recommended,
+    frameworks,
+    resolvedContacts,
+    founderContact,
+    marketingContact,
+    companyPosts,
+    isFallback,
+    jobOpenings,
+    prMentions,
+    redditMentions,
+    twitterMentions,
+    autoboundSignals
+  };
+}

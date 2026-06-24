@@ -14,7 +14,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { token, path, referrer } = body;
+    const { token, path, referrer, test } = body;
 
     if (!token) {
       return NextResponse.json({ error: 'Token required' }, { status: 400, headers: corsHeaders() });
@@ -31,7 +31,29 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid tracking token ID' }, { status: 403, headers: corsHeaders() });
     }
 
-    // 2. Capture the visitor's IP address safely behind Vercel's proxy headers
+    // 2. Handle Simulation/Test Mode
+    if (test) {
+      const { error: insertErr } = await supabaseAdmin.from('visitor_logs').insert({
+        tracker_id: tracker.id,
+        user_id: tracker.user_id,
+        company_name: 'Stripe, Inc. (Test)',
+        company_domain: 'stripe.com',
+        page_path: path || '/',
+        referrer: referrer || 'Test Simulation'
+      });
+
+      if (insertErr) {
+        console.error('Error inserting test visitor log:', insertErr);
+        throw insertErr;
+      }
+
+      return NextResponse.json({ success: true, test: true }, { 
+        status: 200,
+        headers: corsHeaders()
+      });
+    }
+
+    // 3. Capture the visitor's IP address safely behind Vercel's proxy headers
     const visitorIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
                       req.headers.get('x-real-ip') || 
                       '127.0.0.1';
@@ -42,7 +64,7 @@ export async function POST(req) {
       targetIp = '13.111.23.4'; // Stripe Corporate IP
     }
 
-    // 3. Query the ipapi.is B2B enrichment service using the secure API key
+    // 4. Query the ipapi.is B2B enrichment service using the secure API key
     const ipapiKey = process.env.IPAPI_KEY || 'ee0e4f03d78c955b4983';
     const ipapiRes = await fetch(`https://api.ipapi.is?ip=${targetIp}&key=${ipapiKey}`);
     
@@ -52,12 +74,12 @@ export async function POST(req) {
 
     const ipData = await ipapiRes.json();
 
-    // 4. Filter out residential ISPs
-    if (ipData.is_company && ipData.company) {
+    // 5. Filter out residential ISPs and hosting/datacenter networks to isolate corporate visitors
+    if (ipData.company && ipData.company.name && ipData.company.type && ipData.company.type !== 'isp' && ipData.company.type !== 'hosting') {
       const companyName = ipData.company.name;
       const companyDomain = ipData.company.domain;
 
-      // 5. Write validated B2B hit record into visitor_logs
+      // 6. Write validated B2B hit record into visitor_logs
       const { error: insertErr } = await supabaseAdmin.from('visitor_logs').insert({
         tracker_id: tracker.id,
         user_id: tracker.user_id,

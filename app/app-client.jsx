@@ -9,18 +9,19 @@ import Auth from '../components/Auth';
 import { supabase } from '../lib/supabaseClient';
 import { REAL_PROFILES, REAL_SIGNALS, REAL_CREDITS } from '../lib/realData';
 import IpIntelligencePage from '../components/IpIntelligencePage';
+import SignalFeedPage from '../components/SignalFeedPage';
+import DailyBriefPage from '../components/DailyBriefPage';
+import OnboardingWizard from '../components/OnboardingWizard';
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Signal Dashboard', icon: '⚡' },
-  { id: 'upload', label: 'Upload Profiles', icon: '📁' },
-  { id: 'profiles', label: 'Monitored Profiles', icon: '👥' },
-  { id: 'poll', label: 'Run Poll', icon: '🔄' },
-  { id: 'ip-intel', label: 'IP Intelligence', icon: '🌐' },
+  { id: 'brief', label: "Today's Targets", icon: '📋' },
+  { id: 'feed', label: 'Signal Center', icon: '📡' },
+  { id: 'profiles', label: 'Monitored Accounts', icon: '👥' },
 ];
 
 export default function App() {
   const [session, setSession] = useState(null);
-  const [page, setPage] = useState('dashboard');
+  const [page, setPage] = useState('brief');
   const [profiles, setProfiles] = useState([]);
   const [signals, setSignals] = useState([]);
   const [trackerId, setTrackerId] = useState(null);
@@ -31,6 +32,26 @@ export default function App() {
   const [credits, setCredits] = useState(REAL_CREDITS);
   const [loadingSession, setLoadingSession] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
+  const [targetDept, setTargetDept] = useState('Marketing');
+  const [targetSeniority, setTargetSeniority] = useState('VP');
+  const [onboardingSettings, setOnboardingSettings] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  // Parent-level correlate cache: key = "companyName|dept|seniority", value = correlate API result
+  // This prevents re-fetching (and burning credits) every time a user re-opens a company dossier.
+  const [correlateCache, setCorrelateCache] = useState({});
+
+  // Load Onboarding Settings on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('onboarding_settings');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setOnboardingSettings(parsed);
+      if (parsed.targetDept) setTargetDept(parsed.targetDept);
+      if (parsed.targetSeniority) setTargetSeniority(parsed.targetSeniority);
+    } else {
+      setShowOnboarding(true);
+    }
+  }, []);
 
   // Listen for Authentication state changes
   useEffect(() => {
@@ -65,7 +86,7 @@ export default function App() {
 
   // Fetch data or seed default profiles if project tables are empty
   useEffect(() => {
-    if (!session) {
+    if (!session?.user?.id) {
       setProfiles([]);
       setSignals([]);
       setTrackerId(null);
@@ -74,7 +95,10 @@ export default function App() {
     }
 
     async function hydrateCache() {
-      setLoadingData(true);
+      // Only show full screen loader on initial hydration (profiles empty)
+      if (profiles.length === 0) {
+        setLoadingData(true);
+      }
       try {
         const [profilesRes, signalsRes, trackersRes, logsRes] = await Promise.all([
           supabase.from('profiles').select('*').order('added_at', { ascending: false }),
@@ -88,8 +112,21 @@ export default function App() {
         if (trackersRes.error) throw trackersRes.error;
         if (logsRes.error) throw logsRes.error;
 
-        setProfiles((profilesRes.data || []).map(mapProfile));
-        setSignals((signalsRes.data || []).map(mapSignal));
+        // Merge DB profiles with REAL_PROFILES: DB wins if same id exists, else REAL_PROFILES fills gaps
+        const dbProfileIds = new Set((profilesRes.data || []).map(p => p.id));
+        const mergedProfiles = [
+          ...(profilesRes.data || []).map(mapProfile),
+          ...REAL_PROFILES.filter(rp => !dbProfileIds.has(rp.id))
+        ];
+        setProfiles(mergedProfiles);
+
+        // Merge DB signals with REAL_SIGNALS: DB wins on id collision
+        const dbSignalIds = new Set((signalsRes.data || []).map(s => s.id));
+        const mergedSignals = [
+          ...(signalsRes.data || []).map(mapSignal),
+          ...REAL_SIGNALS.filter(rs => !dbSignalIds.has(rs.id))
+        ];
+        setSignals(mergedSignals);
         setVisitorLogs(logsRes.data || []);
 
         let currentTrackerId = null;
@@ -122,7 +159,7 @@ export default function App() {
     }
 
     hydrateCache();
-  }, [session]);
+  }, [session?.user?.id]);
 
   const refreshData = async () => {
     if (!session) return;
@@ -137,8 +174,18 @@ export default function App() {
       if (signalsRes.error) throw signalsRes.error;
       if (logsRes.error) throw logsRes.error;
 
-      setProfiles((profilesRes.data || []).map(mapProfile));
-      setSignals((signalsRes.data || []).map(mapSignal));
+      // Re-merge with REAL_PROFILES / REAL_SIGNALS to preserve snapshot data
+      const dbProfileIds = new Set((profilesRes.data || []).map(p => p.id));
+      setProfiles([
+        ...(profilesRes.data || []).map(mapProfile),
+        ...REAL_PROFILES.filter(rp => !dbProfileIds.has(rp.id))
+      ]);
+
+      const dbSignalIds = new Set((signalsRes.data || []).map(s => s.id));
+      setSignals([
+        ...(signalsRes.data || []).map(mapSignal),
+        ...REAL_SIGNALS.filter(rs => !dbSignalIds.has(rs.id))
+      ]);
       setVisitorLogs(logsRes.data || []);
     } catch (err) {
       console.error("Error refreshing Supabase state:", err);
@@ -293,6 +340,19 @@ export default function App() {
             >
               <span className="nav-icon">{item.icon}</span>
               {item.label}
+              {item.id === 'brief' && signals.filter(s => !s.dismissed).length > 0 && (
+                <span style={{
+                  marginLeft: 'auto',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  color: 'white',
+                  borderRadius: '10px',
+                  padding: '1px 7px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}>
+                  {signals.filter(s => !s.dismissed).length}
+                </span>
+              )}
               {item.id === 'dashboard' && signals.filter(s => s.priority === 'urgent' && !s.dismissed).length > 0 && (
                 <span style={{
                   marginLeft: 'auto',
@@ -304,6 +364,19 @@ export default function App() {
                   fontWeight: 700,
                 }}>
                   {signals.filter(s => s.priority === 'urgent' && !s.dismissed).length}
+                </span>
+              )}
+              {item.id === 'feed' && signals.filter(s => !s.dismissed).length > 0 && (
+                <span style={{
+                  marginLeft: 'auto',
+                  background: 'var(--accent-blue)',
+                  color: 'white',
+                  borderRadius: '10px',
+                  padding: '1px 7px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}>
+                  {signals.filter(s => !s.dismissed).length}
                 </span>
               )}
             </button>
@@ -345,7 +418,7 @@ export default function App() {
 
       {/* Main content */}
       <main className="main">
-        {page === 'dashboard' && (
+        {page === 'brief' && (
           <Dashboard
             signals={signals.filter(s => !s.dismissed)}
             profiles={profiles}
@@ -353,19 +426,58 @@ export default function App() {
             onNavigate={setPage}
             recentSignalIds={recentSignalIds}
             onDismiss={handleDismissSignal}
+            targetDept={targetDept}
+            setTargetDept={setTargetDept}
+            targetSeniority={targetSeniority}
+            setTargetSeniority={setTargetSeniority}
+            correlateCache={correlateCache}
+            setCorrelateCache={setCorrelateCache}
+            userId={session?.user?.id}
+            onProfilesUpdated={refreshData}
           />
         )}
         {page === 'upload' && (
           <UploadPage
-            onUploaded={handleUploaded}
+            onUploaded={async (newProfiles) => {
+              await handleUploaded(newProfiles);
+            }}
             onNavigate={setPage}
             credits={{ remaining: credits.total - credits.used }}
+          />
+        )}
+        {page === 'feed' && (
+          <SignalFeedPage
+            signals={signals}
+            profiles={profiles}
+            onNavigate={setPage}
+            onDismiss={handleDismissSignal}
+            targetDept={targetDept}
+            setTargetDept={setTargetDept}
+            targetSeniority={targetSeniority}
+            setTargetSeniority={setTargetSeniority}
+            trackerId={trackerId}
+            visitorLogs={visitorLogs}
+            onRefresh={refreshData}
+            onboardingSettings={onboardingSettings}
+            correlateCache={correlateCache}
+            setCorrelateCache={setCorrelateCache}
+            userId={session?.user?.id}
           />
         )}
         {page === 'profiles' && (
           <ProfilesPage
             profiles={profiles}
             onNavigate={setPage}
+            targetDept={targetDept}
+            setTargetDept={setTargetDept}
+            targetSeniority={targetSeniority}
+            setTargetSeniority={setTargetSeniority}
+            onUploaded={handleUploaded}
+            apiKey={apiKey}
+            onApiKeyChange={setApiKey}
+            onProfilesUpdated={refreshData}
+            onSignalsDetected={handleSignalsDetected}
+            credits={{ remaining: credits.total - credits.used }}
           />
         )}
         {page === 'poll' && (
@@ -376,16 +488,24 @@ export default function App() {
             onProfilesUpdated={refreshData}
             onSignalsDetected={handleSignalsDetected}
             onNavigate={setPage}
-          />
-        )}
-        {page === 'ip-intel' && (
-          <IpIntelligencePage
-            trackerId={trackerId}
-            visitorLogs={visitorLogs}
-            onRefresh={refreshData}
+            targetDept={targetDept}
+            targetSeniority={targetSeniority}
           />
         )}
       </main>
+
+      {/* Onboarding Wizard Modal Overlay */}
+      {showOnboarding && (
+        <OnboardingWizard
+          onSave={(settings) => {
+            setOnboardingSettings(settings);
+            if (settings.targetDept) setTargetDept(settings.targetDept);
+            if (settings.targetSeniority) setTargetSeniority(settings.targetSeniority);
+            showToast("🚀 Workspace initialized successfully!");
+          }}
+          onClose={() => setShowOnboarding(false)}
+        />
+      )}
 
       {/* Toast notification */}
       {toast && (

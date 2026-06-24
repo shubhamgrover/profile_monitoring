@@ -16,6 +16,9 @@
         apiHost = window.location.origin; // fallback
     }
 
+    // Support a simulator/test flag in the hosting page query parameters (e.g. ?se_test=true)
+    const isTest = window.location.search.includes('se_test=true');
+
     // Send tracking metadata asynchronously back to the ingestion server
     fetch(apiHost + '/api/v1/ingress', {
         method: 'POST',
@@ -23,7 +26,8 @@
         body: JSON.stringify({
             token: token,
             path: window.location.pathname,
-            referrer: document.referrer
+            referrer: document.referrer,
+            test: isTest
         }),
         mode: 'cors'
     }).catch(err => console.warn("Tracking pipeline offline", err));

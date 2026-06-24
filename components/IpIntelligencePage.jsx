@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 
 export default function IpIntelligencePage({ trackerId, visitorLogs = [], onRefresh }) {
   const [copied, setCopied] = useState(false);
   const [origin, setOrigin] = useState('');
+  const [expandedCompany, setExpandedCompany] = useState(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -158,66 +159,139 @@ export default function IpIntelligencePage({ trackerId, visitorLogs = [], onRefr
               </thead>
               <tbody>
                 {visitorLogs.map((log) => {
-                  const logoUrl = `https://logo.clearbit.com/${log.company_domain}`;
+                  const logoUrl = `https://logos.context.dev/?publicClientId=brandLL_46718e0a71177164dc42031e8c8e55e16d4561aeedbe4bd7&domain=${log.company_domain}`;
+                  const fallbackLogoUrl = `https://logo.clearbit.com/${log.company_domain}`;
+                  
+                  const isExpanded = expandedCompany === log.company_domain;
+                  const companyVisits = visitorLogs.filter(v => v.company_domain === log.company_domain);
+                  
                   return (
-                    <tr key={log.id}>
-                      <td style={{ paddingLeft: '24px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <img 
-                            src={logoUrl}
-                            onError={(e) => { 
-                              e.target.style.display = 'none'; 
-                            }} 
-                            style={{ 
-                              width: '28px', 
-                              height: '28px', 
-                              borderRadius: '6px', 
-                              background: '#fff', 
-                              padding: '2px',
-                              border: '1px solid rgba(255,255,255,0.1)'
-                            }}
-                            alt=""
-                          />
-                          <span className="profile-name" style={{ fontWeight: 600 }}>{log.company_name}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <a 
-                          href={`https://${log.company_domain}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}
-                        >
-                          {log.company_domain} ↗
-                        </a>
-                      </td>
-                      <td>
-                        <code style={{ background: 'var(--bg-elevated)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>
-                          {log.page_path}
-                        </code>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                          {log.referrer ? (
-                            <a 
-                              href={log.referrer} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              style={{ color: 'inherit', textDecoration: 'none' }}
-                            >
-                              {log.referrer.length > 35 ? log.referrer.slice(0, 35) + '...' : log.referrer}
-                            </a>
-                          ) : (
-                            'Direct / Search'
-                          )}
-                        </span>
-                      </td>
-                      <td>
-                        <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                          {formatTimestamp(log.created_at)}
-                        </span>
-                      </td>
-                    </tr>
+                    <Fragment key={log.id}>
+                      <tr 
+                        style={{ cursor: 'pointer', transition: 'background 0.2s' }}
+                        onClick={() => setExpandedCompany(isExpanded ? null : log.company_domain)}
+                      >
+                        <td style={{ paddingLeft: '24px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <img 
+                              src={logoUrl}
+                              onError={(e) => { 
+                                if (e.target.src !== fallbackLogoUrl) {
+                                  e.target.src = fallbackLogoUrl;
+                                } else {
+                                  e.target.style.display = 'none';
+                                }
+                              }} 
+                              style={{ 
+                                width: '28px', 
+                                height: '28px', 
+                                borderRadius: '6px', 
+                                background: '#fff', 
+                                padding: '2px',
+                                border: '1px solid rgba(255,255,255,0.1)'
+                              }}
+                              alt=""
+                            />
+                            <div>
+                              <span className="profile-name" style={{ fontWeight: 600 }}>{log.company_name}</span>
+                              {companyVisits.length > 1 && (
+                                <span style={{ 
+                                  marginLeft: '8px', 
+                                  fontSize: '11px', 
+                                  background: 'rgba(59, 130, 246, 0.2)', 
+                                  color: '#60a5fa', 
+                                  padding: '2px 6px', 
+                                  borderRadius: '12px',
+                                  fontWeight: 500
+                                }}>
+                                  {companyVisits.length} visits
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <a 
+                            href={`https://${log.company_domain}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {log.company_domain} ↗
+                          </a>
+                        </td>
+                        <td>
+                          <code style={{ background: 'var(--bg-elevated)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>
+                            {log.page_path}
+                          </code>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                            {log.referrer ? (
+                              <a 
+                                href={log.referrer} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                style={{ color: 'inherit', textDecoration: 'none' }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {log.referrer.length > 35 ? log.referrer.slice(0, 35) + '...' : log.referrer}
+                              </a>
+                            ) : (
+                              'Direct / Search'
+                            )}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between', paddingRight: '12px' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                              {formatTimestamp(log.created_at)}
+                            </span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                              {isExpanded ? '▲' : '▼'}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr style={{ background: 'rgba(15, 23, 42, 0.3)' }}>
+                          <td colSpan="5" style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ paddingLeft: '32px' }}>
+                              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                📄 Customer Journey Timeline for {log.company_name}
+                              </h4>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '2px solid rgba(255,255,255,0.1)', paddingLeft: '16px', marginLeft: '6px' }}>
+                                {companyVisits.map((visit, index) => {
+                                  let refText = 'Direct / Search';
+                                  try {
+                                    if (visit.referrer) refText = `via ${new URL(visit.referrer).hostname}`;
+                                  } catch (_) {
+                                    refText = `via ${visit.referrer}`;
+                                  }
+                                  return (
+                                    <div key={visit.id} style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px' }}>
+                                      <div style={{ position: 'absolute', left: '-21px', top: '6px', width: '8px', height: '8px', borderRadius: '50%', background: index === 0 ? 'var(--accent-blue)' : 'rgba(255,255,255,0.3)' }} />
+                                      <div>
+                                        <code style={{ background: 'var(--bg-elevated)', padding: '3px 8px', borderRadius: '4px', fontSize: '12px', color: 'var(--text-primary)', fontFamily: 'monospace' }}>
+                                          {visit.page_path || '/'}
+                                        </code>
+                                        <span style={{ marginLeft: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                                          {refText}
+                                        </span>
+                                      </div>
+                                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        {new Date(visit.created_at).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>

@@ -7,38 +7,42 @@
 }
 
 :root {
-  --bg-base: #080C14;
-  --bg-surface: #0F1623;
-  --bg-elevated: #161E2E;
-  --bg-card: #1A2236;
-  --border: #1F2D45;
-  --border-light: #263448;
+  --bg-base: #FFFFFF;
+  --bg-surface: #F8F9FA;
+  --bg-elevated: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --border: #E2E8F0;
+  --border-light: #CBD5E1;
 
-  --text-primary: #F0F4FF;
-  --text-secondary: #8B9EC4;
-  --text-muted: #4A5872;
+  --text-primary: #1A202C;
+  --text-secondary: #4A5568;
+  --text-muted: #718096;
 
-  --accent-blue: #3B82F6;
-  --accent-blue-glow: rgba(59, 130, 246, 0.15);
-  --accent-purple: #8B5CF6;
-  --accent-purple-glow: rgba(139, 92, 246, 0.15);
+  --accent-blue: #132D7D;
+  --accent-blue-glow: rgba(19, 45, 125, 0.08);
+  --accent-purple: #FF2A00;
+  --accent-purple-glow: rgba(255, 42, 0, 0.08);
 
-  --signal-red: #EF4444;
-  --signal-red-bg: rgba(239, 68, 68, 0.1);
-  --signal-red-border: rgba(239, 68, 68, 0.25);
+  --signal-red: #FF2A00;
+  --signal-red-bg: rgba(255, 42, 0, 0.08);
+  --signal-red-border: rgba(255, 42, 0, 0.2);
 
   --signal-yellow: #F59E0B;
-  --signal-yellow-bg: rgba(245, 158, 11, 0.1);
-  --signal-yellow-border: rgba(245, 158, 11, 0.25);
+  --signal-yellow-bg: rgba(245, 158, 11, 0.08);
+  --signal-yellow-border: rgba(245, 158, 11, 0.2);
 
   --signal-green: #10B981;
-  --signal-green-bg: rgba(16, 185, 129, 0.1);
-  --signal-green-border: rgba(16, 185, 129, 0.25);
+  --signal-green-bg: rgba(16, 185, 129, 0.08);
+  --signal-green-border: rgba(16, 185, 129, 0.2);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --signal-orange: #FF2A00;
+  --signal-orange-bg: rgba(255, 42, 0, 0.08);
+  --signal-orange-border: rgba(255, 42, 0, 0.2);
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 }
 
 html, body {
@@ -897,8 +901,8 @@ input, select, textarea { font-family: inherit; }
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(8, 12, 20, 0.85);
-  backdrop-filter: blur(6px);
+  background: rgba(19, 45, 125, 0.25);
+  backdrop-filter: blur(4px);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -976,6 +980,11 @@ input, select, textarea { font-family: inherit; }
   padding: 1px 6px;
   font-size: 12px;
   font-weight: 600;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Responsive */

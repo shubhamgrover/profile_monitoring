@@ -1,0 +1,14 @@
+# Project Context Guidelines & Rules
+
+## 1. Global Directives
+* **NEVER write functional code without first generating or updating a corresponding test file (`*.test.js` or `*.test.jsx` or `*.test.ts` or `*.test.tsx`).**
+* **Always follow the Plan -> Implement -> Verify cycle. Present a breakdown of structural changes before touching files.**
+* **Maintain strict type safety and linting standards. Reject any code with implicit 'any' types or unhandled promises.**
+* **Do not commit secrets, credentials, or API keys. Implement a mock data strategy for all local execution.**
+
+## 2. Next.js & React Framework Guidelines
+* **Framework:** Next.js (App Router / Pages Router setup, React 19).
+* **Styling:** Vanilla CSS & Inline styles. No ad-hoc utility bloating unless explicitly stated.
+* **Component Design:** Modular, declarative, and highly interactive. Avoid page-load fatigue via responsive Slide-out Drawers and client-side caching.
+* **State Management:** Keep React states focused and local; prevent unneeded re-renders. Use `localStorage` for client workflow tracking.
+* **API Logic:** Keep routes serverless, handling exceptions gracefully. Wrap AI outputs in robust fallback strategies.
