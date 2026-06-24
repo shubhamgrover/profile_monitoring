@@ -11,6 +11,36 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
   const [hoveredDomain, setHoveredDomain] = useState(null);
   const [viewMode, setViewMode] = useState('accounts');
 
+  // GTM Product Positioning settings state
+  const [productName, setProductName] = useState('');
+  const [productDesc, setProductDesc] = useState('');
+  const [competitors, setCompetitors] = useState('');
+  const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('gtm_product_settings');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setProductName(parsed.productName || '');
+          setProductDesc(parsed.productDesc || '');
+          setCompetitors(parsed.competitors || '');
+        }
+      } catch (e) {
+        console.error('Failed to load GTM settings:', e);
+      }
+    }
+  }, []);
+
+  const handleSaveGTMSettings = (e) => {
+    e.preventDefault();
+    const settings = { productName, productDesc, competitors };
+    localStorage.setItem('gtm_product_settings', JSON.stringify(settings));
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2000);
+  };
+
   // Mute / Pause domain tracking state
   const [mutedDomains, setMutedDomains] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -195,6 +225,102 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
             ⚡ Run Poll
           </button>
         </div>
+      </div>
+      {/* GTM Setup & Sales Positioning Panel */}
+      <div style={{
+        background: '#F8F9FA',
+        border: '1px solid #E2E8F0',
+        borderRadius: 0,
+        padding: '20px 24px',
+        marginBottom: 24,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 18 }}>🎯</span>
+          <h2 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: '#132D7D' }}>
+            My Sales Positioning & Product Profile
+          </h2>
+          <span style={{ fontSize: 11, color: '#666666', marginLeft: 'auto' }}>
+            Tailor AI plays and outreach scripts to what you are selling.
+          </span>
+        </div>
+        <form onSubmit={handleSaveGTMSettings} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#666666' }}>Product Name</label>
+              <input
+                type="text"
+                placeholder="e.g. SignalEngine"
+                value={productName}
+                onChange={e => setProductName(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  border: '1px solid #E2E8F0',
+                  background: '#FFFFFF',
+                  color: '#333333',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#666666' }}>Competitors (comma separated)</label>
+              <input
+                type="text"
+                placeholder="e.g. Outreach, Salesloft, ZoomInfo"
+                value={competitors}
+                onChange={e => setCompetitors(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: 12,
+                  border: '1px solid #E2E8F0',
+                  background: '#FFFFFF',
+                  color: '#333333',
+                  outline: 'none'
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#666666' }}>Product Value Proposition / What you are selling</label>
+            <textarea
+              placeholder="e.g. We provide real-time intent signal detection (recruitment, sitemap changes, capital deployment) to auto-generate personalized B2B outreach scripts for outbound sales reps."
+              value={productDesc}
+              onChange={e => setProductDesc(e.target.value)}
+              rows={2}
+              style={{
+                padding: '8px 12px',
+                fontSize: 12,
+                border: '1px solid #E2E8F0',
+                background: '#FFFFFF',
+                color: '#333333',
+                outline: 'none',
+                resize: 'vertical',
+                fontFamily: 'inherit'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
+            {isSaved && (
+              <span style={{ fontSize: 11, color: 'var(--signal-green)', fontWeight: 600 }}>
+                ✓ Settings saved successfully!
+              </span>
+            )}
+            <button
+              type="submit"
+              style={{
+                padding: '8px 18px',
+                fontSize: 12,
+                fontWeight: 700,
+                background: '#132D7D',
+                border: 'none',
+                color: '#FFFFFF',
+                cursor: 'pointer'
+              }}
+            >
+              Save Positioning Profile
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Watchlist Stats Cards */}

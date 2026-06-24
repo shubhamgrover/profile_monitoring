@@ -164,8 +164,15 @@ async function handleCorrelateRequest(body) {
     const domain = body.domain;
     targetDept = body.targetDept || 'Marketing';
     targetSeniority = body.targetSeniority || 'VP';
-    const productDesc = body.productDesc || 'SignalEngine B2B tracking tool';
-    const valueProposition = body.valueProposition || 'gives enterprise teams an additional outbound channel and removes dependence on traditional ad spend';
+    const gtmSettings = body.gtmSettings || {};
+    const productName = gtmSettings.productName || 'SignalEngine';
+    const competitors = gtmSettings.competitors || 'traditional ad networks';
+    const productDesc = gtmSettings.productDesc 
+      ? `${productName} (${gtmSettings.productDesc})` 
+      : (body.productDesc || 'SignalEngine B2B tracking tool');
+    const valueProposition = gtmSettings.productDesc 
+      ? `Outperforming competitors like ${competitors} by addressing the specific pain: ${gtmSettings.productDesc}` 
+      : (body.valueProposition || 'gives enterprise teams an additional outbound channel and removes dependence on traditional ad spend');
     enrichedData = { ...(body.snapData || {}) };
     
     if (!companyName) {

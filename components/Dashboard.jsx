@@ -398,89 +398,135 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
 
       <div className="page-content" style={{ padding: '24px 28px', maxWidth: 900, margin: '0 auto' }}>
 
-        {/* === Mission Header === */}
-        <div style={{ marginBottom: 24, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-              {greeting}, Shubham {'\u{1F44B}'}
-            </h2>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
-              {dateStr} {'\u00B7'} {signalCount} active signals across {groupedCompanies.length} companies
-            </p>
+        {/* === Executive Header === */}
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+            {greeting}, Shubham {'\u{1F44B}'}
+          </h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+            {dateStr}
+          </p>
+        </div>
+
+        {/* === Executive Metrics Dashboard Bar === */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 16,
+          marginBottom: 24,
+        }}>
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            padding: '14px 18px',
+            borderRadius: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Monitored Targets</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>{profiles.length}</span>
           </div>
-          {/* Mission progress */}
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 0, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Today&apos;s mission</div>
-            <div style={{ display: 'flex', gap: 5 }}>
-              {Array.from({ length: missionTotal }, (_, i) => (
-                <div key={i} style={{ width: 9, height: 9, borderRadius: 0, background: i < doneCount ? 'var(--signal-green)' : 'var(--border)', transition: 'background 0.3s' }} />
-              ))}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: doneCount >= missionTotal && missionTotal > 0 ? 'var(--signal-green)' : 'var(--text-primary)' }}>
-              {doneCount >= missionTotal && missionTotal > 0 ? '\u{1F389} Complete!' : `${doneCount}/${missionTotal}`}
-            </div>
+          
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            padding: '14px 18px',
+            borderRadius: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Signals</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>{signalCount}</span>
+          </div>
+
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            padding: '14px 18px',
+            borderRadius: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Surging Today</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: '#FF2A00' }}>
+              {groupedCompanies.filter(grp => 
+                (grp.synthesis?.surgeScore && grp.synthesis.surgeScore > 75) || 
+                grp.priority === 'urgent'
+              ).length}
+            </span>
           </div>
         </div>
-        {/* Global Intent Filter Toolbar */}
+
+        {/* Consolidated Horizontal Filter Toolbar */}
         <div style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border)',
           borderRadius: 0,
-          padding: '16px 20px',
+          padding: '12px 20px',
           marginBottom: 24,
           display: 'flex',
-          flexDirection: 'column',
-          gap: 12
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 16
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>🔍</span>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search accounts or contacts..."
-                style={{
-                  fontSize: 13,
-                  padding: '6px 12px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-elevated)',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                  width: 260
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Urgency:</span>
+          {/* Left search */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 200px' }}>
+            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>🔍</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search accounts/contacts..."
+              style={{
+                fontSize: 12,
+                padding: '6px 10px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-elevated)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                width: '100%',
+                maxWidth: 240
+              }}
+            />
+          </div>
+
+          {/* Right filters */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            {/* Urgency */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginRight: 4 }}>Urgency:</span>
               {[['all','All'], ['urgent','Urgent'], ['week','Week'], ['watch','Watch']].map(([val, label]) => (
                 <button
                   key={val}
                   onClick={() => setFilter(val)}
                   style={{
-                    padding: '4px 10px',
-                    fontSize: 11,
-                    fontWeight: 600,
+                    padding: '4px 8px',
+                    fontSize: 10,
+                    fontWeight: 700,
                     background: filter === val ? '#132D7D' : 'rgba(19, 45, 125, 0.05)',
                     border: `1px solid ${filter === val ? '#132D7D' : 'rgba(19, 45, 125, 0.15)'}`,
                     color: filter === val ? 'white' : '#132D7D',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
                   }}
                 >
                   {label}
                 </button>
               ))}
             </div>
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            {/* Trigger Category */}
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Trigger:</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Trigger:</span>
               <select
                 value={triggerCategoryFilter}
                 onChange={(e) => setTriggerCategoryFilter(e.target.value)}
                 style={{
-                  padding: '5px 10px',
-                  fontSize: 12,
+                  padding: '5px 8px',
+                  fontSize: 11,
                   fontWeight: 600,
                   border: '1px solid var(--border)',
                   background: 'var(--bg-elevated)',
@@ -489,59 +535,59 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
                   outline: 'none'
                 }}
               >
-                <option value="all">All Intent Triggers</option>
-                <option value="product">Product Launch / Sitemaps</option>
-                <option value="funding">Capital Deployment / Funding</option>
-                <option value="hiring">Recruitment / Hiring</option>
-                <option value="media">Marketing & Media Push</option>
+                <option value="all">All Triggers</option>
+                <option value="product">Product / Sitemaps</option>
+                <option value="funding">Funding</option>
+                <option value="hiring">Hiring</option>
+                <option value="media">Media Push</option>
                 <option value="thought">Thought Leadership</option>
               </select>
             </div>
 
-            {/* Department Alignment selector */}
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Dept:</span>
-                <select 
-                  value={targetDept} 
-                  onChange={(e) => setTargetDept(e.target.value)}
-                  style={{
-                    padding: '5px 10px',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-elevated)',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    outline: 'none'
-                  }}
-                >
-                  {['Marketing', 'Sales', 'HR', 'Engineering', 'Operations', 'Product'].map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Seniority:</span>
-                <select 
-                  value={targetSeniority} 
-                  onChange={(e) => setTargetSeniority(e.target.value)}
-                  style={{
-                    padding: '5px 10px',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-elevated)',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    outline: 'none'
-                  }}
-                >
-                  {['C-Suite', 'VP', 'Director', 'Manager', 'All'].map(s => (
-                    <option key={s} value={s}>{s === 'All' ? 'All Tiers' : s}</option>
-                  ))}
-                </select>
-              </div>
+            {/* Dept */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Dept:</span>
+              <select 
+                value={targetDept} 
+                onChange={(e) => setTargetDept(e.target.value)}
+                style={{
+                  padding: '5px 8px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-elevated)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                {['Marketing', 'Sales', 'HR', 'Engineering', 'Operations', 'Product'].map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Seniority */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Seniority:</span>
+              <select 
+                value={targetSeniority} 
+                onChange={(e) => setTargetSeniority(e.target.value)}
+                style={{
+                  padding: '5px 8px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-elevated)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                {['C-Suite', 'VP', 'Director', 'Manager', 'All'].map(s => (
+                  <option key={s} value={s}>{s === 'All' ? 'All Tiers' : s}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -989,6 +1035,18 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
     (async () => {
       setLoadingAI(true);
       try {
+        let gtmSettings = null;
+        if (typeof window !== 'undefined') {
+          try {
+            const stored = localStorage.getItem('gtm_product_settings');
+            if (stored) {
+              gtmSettings = JSON.parse(stored);
+            }
+          } catch (e) {
+            console.error('Failed to load gtm settings:', e);
+          }
+        }
+
         const res = await fetch('/api/correlate', { 
           method: 'POST', 
           headers: { 'Content-Type': 'application/json' }, 
@@ -997,7 +1055,8 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
             domain: group.domain, 
             snapData: snapData, 
             targetDept, 
-            targetSeniority 
+            targetSeniority,
+            gtmSettings
           }) 
         });
         if (res.ok && active) {
