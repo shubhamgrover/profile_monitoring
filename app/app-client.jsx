@@ -385,20 +385,7 @@ export default function App() {
           </button>
         </nav>
 
-        <div className="sidebar-credits">
-          <div className="credits-card">
-            <div className="credits-label">Credits</div>
-            <div className="credits-count">{remainingCredits} remaining</div>
-            <div className="credits-bar-bg">
-              <div className="credits-bar-fill" style={{ width: `${creditsUsedPct}%` }} />
-            </div>
-            <div className="credits-sub">
-              {credits.plan === 'Pay-as-you-go'
-                ? `${displayUsed} used this period · Pay-as-you-go`
-                : `${displayUsed} of ${displayTotal} used · ${credits.plan}`}
-            </div>
-          </div>
-        </div>
+        {/* Credits section removed for PM layout optimization */}
       </aside>
 
       {/* Main content */}
