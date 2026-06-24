@@ -506,7 +506,7 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
 
                     return (
                       <tr 
-                        key={row.domain} 
+                        key={row.name} 
                         style={{ 
                           borderBottom: '1px solid #E2E8F0',
                           opacity: isMuted ? 0.5 : 1,
