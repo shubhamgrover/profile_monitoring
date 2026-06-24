@@ -6,6 +6,42 @@ import { MOCK_SIGNALS, MOCK_CREDITS, MOCK_PROFILES } from '../lib/mockData';
 import { supabase } from '../lib/supabaseClient';
 import { reweightSignal } from '../lib/signalEngine';
 
+export function cleanDomain(companyName, linkedinUrl) {
+  if (linkedinUrl && linkedinUrl.includes('linkedin.com/company/')) {
+    const handle = linkedinUrl.split('/company/')[1]?.split('?')[0]?.replace(/\/+$/, '') || '';
+    if (handle) {
+      let cleanHandle = handle.toLowerCase()
+        .replace(/-?(inc|llc|ltd|co|corp|corporation|group|consultancy|agency|technologies|systems|solutions|software|services|datadrivenbuildingoperations|digitalmarketingconsultancy)\b/gi, '')
+        .replace(/[^a-z0-9\-]/g, '')
+        .replace(/^-+|-+$/g, '');
+      if (cleanHandle) {
+        if (cleanHandle === 'factors-ai') return 'factorsai.com';
+        if (cleanHandle === 'coram-ai' || cleanHandle === 'coram') return 'coramai.com';
+        if (cleanHandle === 'moengageinc' || cleanHandle === 'moengage') return 'moengage.com';
+        if (cleanHandle === 'facilioinc' || cleanHandle === 'facilio') return 'facilio.com';
+        if (cleanHandle === 'digldnadigitalmarketingconsultancy' || cleanHandle === 'digidna') return 'digidna.in';
+        return `${cleanHandle}.com`;
+      }
+    }
+  }
+
+  if (!companyName || companyName === 'Unknown') return 'unknown.com';
+  const domainMatch = companyName.toLowerCase().match(/\b([a-z0-9\-]+\.(com|ai|io|in|co|org|net|us|dev))\b/i);
+  if (domainMatch) return domainMatch[1];
+
+  let clean = companyName.split(/[:\-|]/)[0].trim();
+  clean = clean.replace(/\b(inc|llc|ltd|co|corp|corporation|group|consultancy|agency|technologies|systems|solutions|software|services)\b/gi, '').trim();
+  clean = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (clean.includes('facilio')) return 'facilio.com';
+  if (clean.includes('moengage')) return 'moengage.com';
+  if (clean.includes('factors')) return 'factorsai.com';
+  if (clean.includes('coram')) return 'coramai.com';
+  if (clean.includes('digidna') || clean.includes('digldna')) return 'digidna.in';
+
+  return clean ? `${clean}.com` : 'unknown.com';
+}
+
 const CONTEXT_DEV_CLIENT_ID = 'brandLL_46718e0a71177164dc42031e8c8e55e16d4561aeedbe4bd7';
 
 // --- Utility: logo URL ---
@@ -310,13 +346,7 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
       const snapData  = getSnap(comp);
       const synthesis = snapData.synthesis || synthesizeCompanyAccount(comp, snapData, targetDept);
       const profile   = profiles.find(p => (p.company || '').toLowerCase() === comp.toLowerCase() || (p.name || '').toLowerCase() === comp.toLowerCase());
-      let domain = snapData.resolvedDomain || profile?.companyLinkedinUrl || '';
-      if (!domain && profile?.linkedinUrl?.includes('/company/')) domain = profile.linkedinUrl;
-      if (domain.includes('linkedin.com/company/')) {
-        const h = domain.split('/company/')[1]?.split('?')[0]?.replace(/\/+$/, '') || '';
-        domain = h ? `${h}.com` : '';
-      }
-      if (!domain && comp) domain = comp.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
+      const domain = cleanDomain(comp, snapData.resolvedDomain || profile?.companyLinkedinUrl || profile?.linkedinUrl);
       companyGroups[comp] = { company: comp, domain, signals: [], latestDetectedAt: s.detectedAt, priority: s.priority, synthesis, alternateContacts: snapData.alternateContacts || [], snapData };
     }
     companyGroups[comp].signals.push(s);

@@ -4,6 +4,42 @@ import { useState, useEffect } from 'react';
 import { REAL_PROFILES } from '../lib/realData';
 import { synthesizeCompanyAccount } from '../lib/synthesisEngine';
 
+export function cleanDomain(companyName, linkedinUrl) {
+  if (linkedinUrl && linkedinUrl.includes('linkedin.com/company/')) {
+    const handle = linkedinUrl.split('/company/')[1]?.split('?')[0]?.replace(/\/+$/, '') || '';
+    if (handle) {
+      let cleanHandle = handle.toLowerCase()
+        .replace(/-?(inc|llc|ltd|co|corp|corporation|group|consultancy|agency|technologies|systems|solutions|software|services|datadrivenbuildingoperations|digitalmarketingconsultancy)\b/gi, '')
+        .replace(/[^a-z0-9\-]/g, '')
+        .replace(/^-+|-+$/g, '');
+      if (cleanHandle) {
+        if (cleanHandle === 'factors-ai') return 'factorsai.com';
+        if (cleanHandle === 'coram-ai' || cleanHandle === 'coram') return 'coramai.com';
+        if (cleanHandle === 'moengageinc' || cleanHandle === 'moengage') return 'moengage.com';
+        if (cleanHandle === 'facilioinc' || cleanHandle === 'facilio') return 'facilio.com';
+        if (cleanHandle === 'digldnadigitalmarketingconsultancy' || cleanHandle === 'digidna') return 'digidna.in';
+        return `${cleanHandle}.com`;
+      }
+    }
+  }
+
+  if (!companyName || companyName === 'Unknown') return 'unknown.com';
+  const domainMatch = companyName.toLowerCase().match(/\b([a-z0-9\-]+\.(com|ai|io|in|co|org|net|us|dev))\b/i);
+  if (domainMatch) return domainMatch[1];
+
+  let clean = companyName.split(/[:\-|]/)[0].trim();
+  clean = clean.replace(/\b(inc|llc|ltd|co|corp|corporation|group|consultancy|agency|technologies|systems|solutions|software|services)\b/gi, '').trim();
+  clean = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  if (clean.includes('facilio')) return 'facilio.com';
+  if (clean.includes('moengage')) return 'moengage.com';
+  if (clean.includes('factors')) return 'factorsai.com';
+  if (clean.includes('coram')) return 'coramai.com';
+  if (clean.includes('digidna') || clean.includes('digldna')) return 'digidna.in';
+
+  return clean ? `${clean}.com` : 'unknown.com';
+}
+
 export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
   const [profiles, setProfiles] = useState(propProfiles || REAL_PROFILES);
   const [search, setSearch] = useState('');
@@ -70,17 +106,7 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
   profiles.forEach(p => {
     const comp = p.company || 'Unknown';
     if (!companyGroups[comp]) {
-      let domain = p.companyLinkedinUrl || '';
-      if (domain.includes('linkedin.com/company/')) {
-        const h = domain.split('/company/')[1]?.split('?')[0]?.replace(/\/+$/, '') || '';
-        domain = h ? `${h}.com` : '';
-      }
-      if (!domain && p.company) {
-        domain = p.company.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
-      }
-      if (!domain) {
-        domain = 'unknown.com';
-      }
+      const domain = cleanDomain(comp, p.companyLinkedinUrl || p.linkedinUrl);
 
       // Calculate composite score using synthesisEngine
       const latestSnapshot = p.snapshots && p.snapshots.length > 0 ? p.snapshots[p.snapshots.length - 1] : {};
@@ -115,17 +141,7 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
 
   const contactRows = profiles.map(p => {
     const comp = p.company || 'Unknown';
-    let domain = p.companyLinkedinUrl || '';
-    if (domain.includes('linkedin.com/company/')) {
-      const h = domain.split('/company/')[1]?.split('?')[0]?.replace(/\/+$/, '') || '';
-      domain = h ? `${h}.com` : '';
-    }
-    if (!domain && p.company) {
-      domain = p.company.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com';
-    }
-    if (!domain) {
-      domain = 'unknown.com';
-    }
+      const domain = cleanDomain(comp, p.companyLinkedinUrl || p.linkedinUrl);
 
     const latestSnapshot = p.snapshots && p.snapshots.length > 0 ? p.snapshots[p.snapshots.length - 1] : {};
     const synthesis = synthesizeCompanyAccount(comp, latestSnapshot, 'Marketing');

@@ -11,6 +11,16 @@ const PRIORITY_CONFIG = {
   watch:  { label: 'Watch',     color: '#6b7280', bg: 'rgba(107,114,128,0.06)', border: 'rgba(107,114,128,0.15)' },
 };
 
+const formatTimestamp = (dateStr) => {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function SignalFeedPage({ signals, profiles, onNavigate, onDismiss, targetDept = 'Marketing', setTargetDept, targetSeniority = 'VP', setTargetSeniority, trackerId, visitorLogs = [], onRefresh, correlateCache = {}, setCorrelateCache, userId }) {
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('all');

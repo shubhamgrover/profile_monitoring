@@ -525,6 +525,12 @@ We have resolved:
 YOUR STRATEGIC STRATEGY & EXPORT BLUEPRINT:
 Analyze the payload below and deliver a hyper-sharp, non-obvious B2B intelligence brief structured into three distinct layers. Avoid generic fluff like "they want to scale." Focus on highly leveraged, actionable business realities. Make sure observations are crisp and directly help the sales team correlate what is happening.
 
+CRITICAL INSTRUCTIONS FOR CORRELATIONS AND OUTBOUND PITCH:
+- DO NOT generate vague, abstract, or generic correlations (e.g. "Since sitemaps exist, it means they are launching products").
+- Every correlation MUST be hyper-specific to the target account's raw data (e.g. referencing specific titles of job openings, specific recent news, or specific social posts they made).
+- The narrative/reality [A] MUST state a concrete business challenge or internal friction point (e.g. "Since you are hiring a Senior Product Manager for ad-automation and scaling your SEO agencies, it generally means you are struggling with rising customer acquisition costs and need to automate first-party visitor data collection to bypass paid ads").
+- The outreach script [P] MUST pitch our solution in a hyper-targeted, direct way, mentioning their exact trigger events. It must sound like a real human outreach email (warm, peer-to-peer hook script, concise, direct).
+
 🎯 LAYER 1: THE MACRO CORRELATION MAP (Connecting the Dots)
 Identify **at least 5 to 10** "Core Strategic Correlations" or outreach triggers by cross-referencing multiple disparate channels. Ensure you return at least 5-10 separate correlation models in the JSON.
 Format each correlation using this precise logical structure:
