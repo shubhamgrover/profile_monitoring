@@ -80,8 +80,10 @@ export async function POST(request) {
       })
     );
 
-    const textContent = formatEmailText(validatedSignals);
-    const htmlContent = formatEmailHtml(validatedSignals);
+    const finalSignals = filterAndSelectSignals(validatedSignals);
+
+    const textContent = formatEmailText(finalSignals);
+    const htmlContent = formatEmailHtml(finalSignals);
 
     const resendResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -108,6 +110,77 @@ export async function POST(request) {
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+function filterAndSelectSignals(signals) {
+  const priorityOrder = { urgent: 0, week: 1, watch: 2 };
+  
+  // 1. Group by company
+  const grouped = {};
+  for (const s of signals) {
+    const comp = s.company || 'Unknown';
+    if (!grouped[comp]) grouped[comp] = [];
+    grouped[comp].push(s);
+  }
+
+  // 2. Sort signals inside each company by priority
+  for (const comp in grouped) {
+    grouped[comp].sort((a, b) => {
+      const pa = priorityOrder[a.priority] !== undefined ? priorityOrder[a.priority] : 99;
+      const pb = priorityOrder[b.priority] !== undefined ? priorityOrder[b.priority] : 99;
+      return pa - pb;
+    });
+  }
+
+  // 3. Sort companies by highest priority signal
+  const companies = Object.keys(grouped).map(name => {
+    const sigs = grouped[name];
+    const highestPriority = sigs[0] ? (priorityOrder[sigs[0].priority] !== undefined ? priorityOrder[sigs[0].priority] : 99) : 99;
+    return { name, sigs, highestPriority };
+  });
+  companies.sort((a, b) => a.highestPriority - b.highestPriority);
+
+  // 4. Select signals: limit to 2 per company initially. Top up to 10 total if needed and available.
+  const companySelections = companies.map(c => ({
+    name: c.name,
+    all: c.sigs,
+    selected: []
+  }));
+
+  // Pass 1: Select up to 2 signals per company
+  for (const cs of companySelections) {
+    const toTake = cs.all.slice(0, 2);
+    cs.selected.push(...toTake);
+  }
+
+  // Calculate current total
+  let currentTotal = companySelections.reduce((sum, cs) => sum + cs.selected.length, 0);
+
+  // Pass 2: If total < 10, top up round-robin starting from the 3rd signal
+  if (currentTotal < 10) {
+    let index = 2;
+    let addedAny = true;
+    while (currentTotal < 10 && addedAny) {
+      addedAny = false;
+      for (const cs of companySelections) {
+        if (currentTotal >= 10) break;
+        if (cs.all.length > index) {
+          cs.selected.push(cs.all[index]);
+          currentTotal++;
+          addedAny = true;
+        }
+      }
+      index++;
+    }
+  }
+
+  // Combine back to flat array of selected signals, keeping company grouping order
+  const finalSignals = [];
+  for (const cs of companySelections) {
+    finalSignals.push(...cs.selected);
+  }
+
+  return finalSignals;
 }
 
 function stripHtml(html) {
@@ -162,83 +235,140 @@ function formatCompanyActionHtml(company, label, explanation) {
 }
 
 function formatEmailText(signals) {
-  let text = "Here are the signals from the top companies uploaded:\n\n";
-
-  signals.forEach(s => {
-    const isPost = s.type === 'content_signal' || s.type === 'thought_leadership' || s.type === 'interest_signal';
-    const isCompany = s.type === 'company_funding' || s.type === 'company_signal' || s.type === 'engagement_signal';
-
-    if (isPost) {
-      const topic = extractTopic(s.why, s.label);
-      const isCompanyProfile = s.profile.toLowerCase() === s.company.toLowerCase();
-      const authorPhrase = isCompanyProfile ? s.company : `${s.profile} from ${s.company}`;
-      text += `📝 ${authorPhrase} posted about ${topic}\n`;
-    } else if (isCompany) {
-      const cleanWhy = stripHtml(s.why);
-      text += `${formatCompanyActionText(s.company, s.label, cleanWhy)}\n`;
-    } else {
-      const cleanWhy = stripHtml(s.why);
-      const isCompanyProfile = s.profile.toLowerCase() === s.company.toLowerCase();
-      const contactPhrase = isCompanyProfile ? s.company : `${s.profile} (${s.company})`;
-      text += `⚡ ${contactPhrase}: ${s.label} - ${cleanWhy}\n`;
+  const grouped = {};
+  const companyOrder = [];
+  
+  for (const s of signals) {
+    const comp = s.company || 'Unknown';
+    if (!grouped[comp]) {
+      grouped[comp] = [];
+      companyOrder.push(comp);
     }
-  });
+    grouped[comp].push(s);
+  }
+
+  let text = "⚡ SignalEngine Intelligence Summary\n====================================\n\n";
+
+  for (const comp of companyOrder) {
+    text += `🏢 ${comp.toUpperCase()}\n------------------------------------\n`;
+    grouped[comp].forEach(s => {
+      const isPost = s.type === 'content_signal' || s.type === 'thought_leadership' || s.type === 'interest_signal';
+      const isCompany = s.type === 'company_funding' || s.type === 'company_signal' || s.type === 'engagement_signal';
+
+      if (isPost) {
+        const topic = extractTopic(s.why, s.label);
+        const isCompanyProfile = s.profile.toLowerCase() === s.company.toLowerCase();
+        const authorPhrase = isCompanyProfile ? s.company : s.profile;
+        text += `📝 ${authorPhrase} posted about ${topic}\n`;
+        if (s.postUrl) text += `   Link: ${s.postUrl}\n`;
+      } else if (isCompany) {
+        const cleanWhy = stripHtml(s.why);
+        text += `• ${formatCompanyActionText(s.company, s.label, cleanWhy)}\n`;
+        if (s.postUrl) text += `   Link: ${s.postUrl}\n`;
+      } else {
+        const cleanWhy = stripHtml(s.why);
+        const isCompanyProfile = s.profile.toLowerCase() === s.company.toLowerCase();
+        const contactPhrase = isCompanyProfile ? s.company : s.profile;
+        text += `⚡ ${contactPhrase}: ${s.label} - ${cleanWhy}\n`;
+        if (s.linkedinUrl) text += `   Link: ${s.linkedinUrl}\n`;
+      }
+    });
+    text += "\n";
+  }
 
   return text;
 }
 
 function formatEmailHtml(signals) {
+  const grouped = {};
+  const companyOrder = [];
+  
+  for (const s of signals) {
+    const comp = s.company || 'Unknown';
+    if (!grouped[comp]) {
+      grouped[comp] = [];
+      companyOrder.push(comp);
+    }
+    grouped[comp].push(s);
+  }
+
   let html = `
     <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-      <h2 style="color: #0f172a; margin-bottom: 24px; font-size: 18px; font-weight: 700; border-bottom: 2px solid #3b82f6; padding-bottom: 8px; font-family: system-ui, sans-serif;">Here are the signals from the top companies uploaded:</h2>
-      <ul style="list-style-type: none; padding-left: 0; margin: 0;">
+      <h2 style="color: #0f172a; margin-bottom: 24px; font-size: 18px; font-weight: 700; border-bottom: 2px solid #132D7D; padding-bottom: 8px; font-family: system-ui, sans-serif;">⚡ SignalEngine Intelligence Summary</h2>
   `;
 
-  signals.forEach(s => {
-    const isPost = s.type === 'content_signal' || s.type === 'thought_leadership' || s.type === 'interest_signal';
-    const isCompany = s.type === 'company_funding' || s.type === 'company_signal' || s.type === 'engagement_signal';
+  for (const comp of companyOrder) {
+    const compSignals = grouped[comp];
+    const priorityOrder = { urgent: 0, week: 1, watch: 2 };
+    let highestPriority = 'watch';
+    for (const s of compSignals) {
+      if (s.priority === 'urgent') highestPriority = 'urgent';
+      else if (s.priority === 'week' && highestPriority !== 'urgent') highestPriority = 'week';
+    }
 
-    if (isPost) {
-      const topic = extractTopic(s.why, s.label);
-      const isCompanyProfile = s.profile.toLowerCase() === s.company.toLowerCase();
-      const authorPhrase = isCompanyProfile ? `<strong>${s.company}</strong>` : `<strong>${s.profile}</strong> from <strong>${s.company}</strong>`;
+    const badgeColor = highestPriority === 'urgent' ? '#FF2A00' : highestPriority === 'week' ? '#132D7D' : '#64748b';
+
+    html += `
+      <div style="margin-bottom: 20px; background-color: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="background-color: #132D7D; color: #ffffff; padding: 12px 16px; font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="color: #ffffff;">🏢 ${comp}</span>
+          <span style="background-color: ${badgeColor}; color: #ffffff; font-size: 10px; padding: 2px 8px; border-radius: 12px; font-weight: 600; text-transform: uppercase;">${highestPriority}</span>
+        </div>
+        <div style="padding: 16px;">
+          <ul style="list-style-type: none; padding-left: 0; margin: 0;">
+    `;
+
+    compSignals.forEach(s => {
+      const isPost = s.type === 'content_signal' || s.type === 'thought_leadership' || s.type === 'interest_signal';
+      const isCompany = s.type === 'company_funding' || s.type === 'company_signal' || s.type === 'engagement_signal';
 
       html += `
-        <li style="padding: 14px; margin-bottom: 12px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #3b82f6; box-shadow: 0 1px 2px rgba(0,0,0,0.05); list-style: none;">
-          <div style="font-size: 13px; color: #334155; line-height: 1.5;">
+        <li style="padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; list-style: none; line-height: 1.5;">
+      `;
+
+      if (isPost) {
+        const topic = extractTopic(s.why, s.label);
+        const isCompanyProfile = s.profile.toLowerCase() === s.company.toLowerCase();
+        const authorPhrase = isCompanyProfile ? `<strong>${s.company}</strong>` : `<strong>${s.profile}</strong>`;
+
+        html += `
+          <div style="font-size: 13px; color: #334155;">
             📝 ${authorPhrase} posted about <em>${topic}</em>
           </div>
-          ${s.postUrl ? `<div style="margin-top: 6px;"><a href="${s.postUrl}" target="_blank" style="font-size: 11px; color: #3b82f6; text-decoration: none; font-weight: 600;">🔗 Verify Proof</a></div>` : ''}
-        </li>
-      `;
-    } else if (isCompany) {
-      const cleanWhy = stripHtml(s.why);
-      html += `
-        <li style="padding: 14px; margin-bottom: 12px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #ef4444; box-shadow: 0 1px 2px rgba(0,0,0,0.05); list-style: none;">
-          <div style="font-size: 13px; color: #334155; line-height: 1.5;">
+          ${s.postUrl ? `<div style="margin-top: 6px;"><a href="${s.postUrl}" target="_blank" style="font-size: 11px; color: #FF2A00; text-decoration: none; font-weight: 600;">🔗 Verify Proof</a></div>` : ''}
+        `;
+      } else if (isCompany) {
+        const cleanWhy = stripHtml(s.why);
+        html += `
+          <div style="font-size: 13px; color: #334155;">
             ${formatCompanyActionHtml(s.company, s.label, cleanWhy)}
           </div>
-          ${s.postUrl ? `<div style="margin-top: 6px;"><a href="${s.postUrl}" target="_blank" style="font-size: 11px; color: #3b82f6; text-decoration: none; font-weight: 600;">🔗 Verify Proof</a></div>` : ''}
-        </li>
-      `;
-    } else {
-      const cleanWhy = stripHtml(s.why);
-      const isCompanyProfile = s.profile.toLowerCase() === s.company.toLowerCase();
-      const contactPhrase = isCompanyProfile ? `<strong>${s.company}</strong>` : `<strong>${s.profile}</strong> (${s.company})`;
+          ${s.postUrl ? `<div style="margin-top: 6px;"><a href="${s.postUrl}" target="_blank" style="font-size: 11px; color: #FF2A00; text-decoration: none; font-weight: 600;">🔗 Verify Proof</a></div>` : ''}
+        `;
+      } else {
+        const cleanWhy = stripHtml(s.why);
+        const isCompanyProfile = s.profile.toLowerCase() === s.company.toLowerCase();
+        const contactPhrase = isCompanyProfile ? `<strong>${s.company}</strong>` : `<strong>${s.profile}</strong>`;
 
-      html += `
-        <li style="padding: 14px; margin-bottom: 12px; background-color: #ffffff; border-radius: 6px; border-left: 4px solid #10b981; box-shadow: 0 1px 2px rgba(0,0,0,0.05); list-style: none;">
-          <div style="font-size: 13px; color: #334155; line-height: 1.5;">
+        html += `
+          <div style="font-size: 13px; color: #334155;">
             ⚡ ${contactPhrase}: <strong>${s.label}</strong> - ${cleanWhy}
           </div>
-          ${s.linkedinUrl ? `<div style="margin-top: 6px;"><a href="${s.linkedinUrl}" target="_blank" style="font-size: 11px; color: #3b82f6; text-decoration: none; font-weight: 600;">🔗 View Contact</a></div>` : ''}
-        </li>
-      `;
-    }
-  });
+          ${s.linkedinUrl ? `<div style="margin-top: 6px;"><a href="${s.linkedinUrl}" target="_blank" style="font-size: 11px; color: #FF2A00; text-decoration: none; font-weight: 600;">🔗 View Contact</a></div>` : ''}
+        `;
+      }
+
+      html += `</li>`;
+    });
+
+    html += `
+          </ul>
+        </div>
+      </div>
+    `;
+  }
 
   html += `
-      </ul>
       <div style="margin-top: 24px; font-size: 11px; text-align: center; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 12px;">
         Sent automatically by SignalEngine · ${new Date().toLocaleString()}
       </div>
