@@ -894,6 +894,24 @@ function StatCard({ label, value, sub, badge }) {
   );
 }
 
+// --- Extract PR Date from URL ---
+function extractDateFromUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  // Match YYYY/MM/DD or YYYY-MM-DD
+  const slashMatch = url.match(/\/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})\b/);
+  if (slashMatch) {
+    const [_, y, m, d] = slashMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // Match YYYYMMDD
+  const yymmddMatch = url.match(/\b(20\d{2})([01]\d)([0-3]\d)\b/);
+  if (yymmddMatch) {
+    const [_, y, m, d] = yymmddMatch;
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+}
+
 // --- Company Detail Drawer ---
 export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targetDept = 'Marketing', targetSeniority = 'VP', dynamicContacts = {}, correlateCache = {}, setCorrelateCache, userId, onProfilesUpdated }) {
   const profile = profiles.find(p => (p.company || '').toLowerCase() === group.company.toLowerCase() || (p.name || '').toLowerCase() === group.company.toLowerCase());
@@ -2037,7 +2055,15 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
           const merged = [
             ...snapPR.map(p => {
               if (typeof p === 'string') return { title: p, link: null, pubDate: null, src: 'Press' };
-              return { title: p.title || p.text, link: p.link || p.url, pubDate: p.pubDate || p.date || p.datePublished, src: 'Press' };
+              const link = p.link || p.url;
+              let pubDate = p.pubDate || p.date || p.datePublished;
+              if (!pubDate && link) {
+                pubDate = extractDateFromUrl(link);
+              }
+              if (!pubDate) {
+                pubDate = new Date().toISOString();
+              }
+              return { title: p.title || p.text, link, pubDate, src: 'Press' };
             }),
             ...snapReddit.map(r => {
               if (typeof r === 'string') return { title: r, link: null, pubDate: null, src: 'Reddit' };
