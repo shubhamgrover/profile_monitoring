@@ -1083,7 +1083,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   useEffect(() => {
     // If we have a fully resolved, non-fallback cached result in client state or pre-fetched in database snapshot, use it immediately
     const cached = correlateCache[cacheKey] || snapData.synthesis;
-    if (cached && !cached.isFallback && cached.strategicCorrelations && cached.strategicCorrelations.length > 0) {
+    if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0) {
       setSynthesis(cached);
       if (cached.recommendedFrameworkId) setSelectedFrameworkId(cached.recommendedFrameworkId);
       setAutoboundSignals(cached.autoboundSignals || snapData.autoboundSignals || []);
