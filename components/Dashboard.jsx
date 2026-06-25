@@ -324,6 +324,10 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
   const validFiltered = filtered.map(s => {
     let comp = (s.company || '').trim();
     if (!comp || comp.toLowerCase() === 'unknown' || comp.toLowerCase() === 'unknown company') {
+      const profile = profiles.find(p => (p.name || '').toLowerCase() === (s.profile || '').toLowerCase());
+      if (profile && profile.company && profile.company !== 'Unknown' && profile.company !== '') {
+        return { ...s, company: profile.company };
+      }
       return { ...s, company: s.profile || 'Unresolved Lead' };
     }
     return s;
@@ -349,7 +353,19 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
       const domain = cleanDomain(comp, snapData.resolvedDomain || profile?.companyLinkedinUrl || profile?.linkedinUrl);
       companyGroups[comp] = { company: comp, domain, signals: [], latestDetectedAt: s.detectedAt, priority: s.priority, synthesis, alternateContacts: snapData.alternateContacts || [], snapData };
     }
-    companyGroups[comp].signals.push(s);
+    
+    // Deduplicate identical signals for this company
+    const isDuplicate = companyGroups[comp].signals.some(existing => 
+      existing.type === s.type && 
+      existing.label === s.label && 
+      existing.why === s.why &&
+      existing.profile === s.profile
+    );
+    
+    if (!isDuplicate) {
+      companyGroups[comp].signals.push(s);
+    }
+    
     if (s.priority === 'urgent') companyGroups[comp].priority = 'urgent';
     else if (s.priority === 'week' && companyGroups[comp].priority !== 'urgent') companyGroups[comp].priority = 'week';
     if (new Date(s.detectedAt) > new Date(companyGroups[comp].latestDetectedAt)) companyGroups[comp].latestDetectedAt = s.detectedAt;

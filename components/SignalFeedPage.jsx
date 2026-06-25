@@ -229,6 +229,10 @@ export default function SignalFeedPage({ signals, profiles, onNavigate, onDismis
   const activeSignals = signals.filter(s => !s.dismissed).map(s => {
     let comp = (s.company || '').trim();
     if (!comp || comp.toLowerCase() === 'unknown' || comp.toLowerCase() === 'unknown company') {
+      const profile = profiles.find(p => (p.name || '').toLowerCase() === (s.profile || '').toLowerCase());
+      if (profile && profile.company && profile.company !== 'Unknown' && profile.company !== '') {
+        return { ...s, company: profile.company };
+      }
       return { ...s, company: s.profile || 'Unresolved Lead' };
     }
     return s;
