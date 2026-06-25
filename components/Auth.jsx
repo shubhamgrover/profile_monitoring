@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-export default function Auth() {
+export default function Auth({ onBackToHome }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -179,6 +179,35 @@ export default function Auth() {
             {isSignUp ? 'Sign In' : 'Create Account'}
           </button>
         </div>
+
+        {onBackToHome && (
+          <div style={{
+            marginTop: '16px',
+            textAlign: 'center',
+            borderTop: '1px dashed var(--border)',
+            paddingTop: '12px'
+          }}>
+            <button
+              type="button"
+              className="link-btn"
+              onClick={onBackToHome}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                fontSize: '13px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              ← Back to Home
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

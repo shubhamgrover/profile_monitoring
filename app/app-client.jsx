@@ -12,6 +12,7 @@ import IpIntelligencePage from '../components/IpIntelligencePage';
 import SignalFeedPage from '../components/SignalFeedPage';
 import DailyBriefPage from '../components/DailyBriefPage';
 import OnboardingWizard from '../components/OnboardingWizard';
+import LandingPage from '../components/LandingPage';
 
 const NAV_ITEMS = [
   { id: 'opportunity', label: 'Opportunity Dashboard', icon: '📊' },
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [landingView, setLandingView] = useState(true);
   const [page, setPage] = useState('brief');
   const [profiles, setProfiles] = useState([]);
   const [signals, setSignals] = useState([]);
@@ -296,9 +298,12 @@ export default function App() {
     );
   }
 
-  // If the user is not authenticated, render the login/registration page
+  // If the user is not authenticated, render the landing page or login/registration page
   if (!session) {
-    return <Auth />;
+    if (landingView) {
+      return <LandingPage onGetStarted={() => setLandingView(false)} />;
+    }
+    return <Auth onBackToHome={() => setLandingView(true)} />;
   }
 
   if (loadingData) {
