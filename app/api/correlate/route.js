@@ -316,13 +316,100 @@ async function handleCorrelateRequest(body) {
 
     const domainContext = domain ? ` (${domain})` : '';
     const contactsQuery = `LinkedIn profile of a ${targetSeniority} in the ${targetDept} department at ${companyName}${domainContext} site:linkedin.com/in/`;
-    const exaContacts = await searchExa(contactsQuery, 2, ['linkedin.com']);
-
     const founderQuery = `LinkedIn profile of the CEO, Founder, or President of ${companyName}${domainContext} site:linkedin.com/in/`;
-    const exaFounders = await searchExa(founderQuery, 1, ['linkedin.com']);
-
     const marketingQuery = `LinkedIn profile of the CMO, VP of Marketing, or Head of Marketing at ${companyName}${domainContext} site:linkedin.com/in/`;
-    const exaMarketing = await searchExa(marketingQuery, 1, ['linkedin.com']);
+
+    // 1. Concurrently resolve all Exa searches
+    const promises = [];
+    const keys = [];
+
+    promises.push(searchExa(contactsQuery, 2, ['linkedin.com']));
+    keys.push('contacts');
+
+    promises.push(searchExa(founderQuery, 1, ['linkedin.com']));
+    keys.push('founder');
+
+    promises.push(searchExa(marketingQuery, 1, ['linkedin.com']));
+    keys.push('marketing');
+
+    let companyLinkedinUrl = enrichedData.companyLinkedinUrl || enrichedData.linkedinUrl || '';
+    if (!companyLinkedinUrl || companyLinkedinUrl.includes('/in/')) {
+      promises.push(searchExa(`site:linkedin.com/company/ "${companyName}" official page`, 1, ['linkedin.com']));
+      keys.push('companyLinkedin');
+    }
+
+    let jobOpenings = enrichedData.jobOpenings || [];
+    if (jobOpenings.length === 0) {
+      promises.push(searchExa(`"${companyName}" job openings OR careers page OR "hiring"`, 5));
+      keys.push('jobs');
+    }
+
+    let twitterMentions = enrichedData.twitterMentions || [];
+    if (twitterMentions.length === 0) {
+      promises.push(searchExa(`site:twitter.com OR site:x.com "${companyName}"`, 3));
+      keys.push('twitter');
+    }
+
+    let redditMentions = enrichedData.redditMentions || [];
+    if (redditMentions.length === 0) {
+      promises.push(searchExa(`site:reddit.com "${companyName}"`, 3));
+      keys.push('reddit');
+    }
+
+    let prMentions = enrichedData.prMentions || [];
+    if (prMentions.length === 0) {
+      promises.push(searchExa(`"${companyName}" (funding news OR product launch OR acquisition OR press release)`, 3));
+      keys.push('pr');
+    }
+
+    const searchResults = await Promise.all(promises);
+    const resultObj = {};
+    keys.forEach((key, idx) => {
+      resultObj[key] = searchResults[idx] || [];
+    });
+
+    const exaContacts = resultObj['contacts'] || [];
+    const exaFounders = resultObj['founder'] || [];
+    const exaMarketing = resultObj['marketing'] || [];
+
+    if (resultObj['companyLinkedin'] && resultObj['companyLinkedin'].length > 0) {
+      companyLinkedinUrl = resultObj['companyLinkedin'][0].url;
+      enrichedData.companyLinkedinUrl = companyLinkedinUrl;
+    }
+
+    if (resultObj['jobs']) {
+      const jobResults = resultObj['jobs'];
+      jobOpenings = jobResults
+        .map(r => {
+          let title = r.title || '';
+          // Clean common suffixes and site/job board names from title
+          title = title.replace(/\s*[-|–—•]\s*(LinkedIn|Myworkdayjobs|Careers|Built In|Indeed|Glassdoor|Workday|Jobs|Recruitment|Hiring).*/i, '').trim();
+          return { title, url: r.url };
+        })
+        .filter(job => {
+          const t = job.title.toLowerCase();
+          const c = companyName.toLowerCase();
+          if (t === c || t === 'careers' || t === 'jobs' || t === 'hiring' || t.length < 4) return false;
+          if (t.includes('working at') || t.includes('official site') || t.includes('home page') || t === 'linkedin') return false;
+          return true;
+        });
+      enrichedData.jobOpenings = jobOpenings;
+    }
+
+    if (resultObj['twitter']) {
+      twitterMentions = resultObj['twitter'].map(r => ({ title: r.title, url: r.url }));
+      enrichedData.twitterMentions = twitterMentions;
+    }
+
+    if (resultObj['reddit']) {
+      redditMentions = resultObj['reddit'].map(r => ({ title: r.title, url: r.url }));
+      enrichedData.redditMentions = redditMentions;
+    }
+
+    if (resultObj['pr']) {
+      prMentions = resultObj['pr'].map(r => ({ title: r.title, url: r.url }));
+      enrichedData.prMentions = prMentions;
+    }
 
     // Parsing helpers
     const parseLinkedInTitle = (titleRaw) => {
@@ -417,86 +504,50 @@ async function handleCorrelateRequest(body) {
       resolvedContacts = filterExclusions(resolvedContacts);
     }
 
-    // 2. Fetch Scrape Creators social posts
-    resolvedContacts = await Promise.all(
-      resolvedContacts.map(async (c) => {
-        const posts = await getScrapeCreatorsPosts(c.url);
-        return { ...c, posts };
-      })
-    );
+    // 2. Concurrently fetch all ScrapeCreators social posts in parallel
+    const postPromises = [];
+    const postKeys = [];
 
-    founderContact = null;
+    // resolvedContacts posts
+    resolvedContacts.forEach((c, idx) => {
+      postPromises.push(getScrapeCreatorsPosts(c.url));
+      postKeys.push({ type: 'contact', index: idx });
+    });
+
+    // founderContact post
+    let tempFounderParsed = null;
     if (exaFounders && exaFounders.length > 0) {
-      const parsedFounder = parseExaContact(exaFounders[0], 'CEO / Founder');
-      const posts = await getScrapeCreatorsPosts(parsedFounder.url);
-      founderContact = { ...parsedFounder, posts };
+      tempFounderParsed = parseExaContact(exaFounders[0], 'CEO / Founder');
+      postPromises.push(getScrapeCreatorsPosts(tempFounderParsed.url));
+      postKeys.push({ type: 'founder' });
     }
 
-    marketingContact = null;
+    // marketingContact post
+    let tempMarketingParsed = null;
     if (exaMarketing && exaMarketing.length > 0) {
-      const parsedMarketing = parseExaContact(exaMarketing[0], 'Head of Marketing');
-      const posts = await getScrapeCreatorsPosts(parsedMarketing.url);
-      marketingContact = { ...parsedMarketing, posts };
+      tempMarketingParsed = parseExaContact(exaMarketing[0], 'Head of Marketing');
+      postPromises.push(getScrapeCreatorsPosts(tempMarketingParsed.url));
+      postKeys.push({ type: 'marketing' });
     }
 
-    // 3. Resolve LinkedIn company URL if missing
-    let companyLinkedinUrl = enrichedData.companyLinkedinUrl || enrichedData.linkedinUrl || '';
-    if (!companyLinkedinUrl || companyLinkedinUrl.includes('/in/')) {
-      console.log(`[Correlate API] Resolving company LinkedIn URL for ${companyName}`);
-      const linkedinCompanyResults = await searchExa(`site:linkedin.com/company/ "${companyName}" official page`, 1, ['linkedin.com']);
-      if (linkedinCompanyResults && linkedinCompanyResults.length > 0) {
-        companyLinkedinUrl = linkedinCompanyResults[0].url;
-        enrichedData.companyLinkedinUrl = companyLinkedinUrl;
+    // company posts
+    postPromises.push(getCompanyPagePosts(companyName, companyLinkedinUrl));
+    postKeys.push({ type: 'company' });
+
+    const postResults = await Promise.all(postPromises);
+
+    postKeys.forEach((key, idx) => {
+      const posts = postResults[idx] || [];
+      if (key.type === 'contact') {
+        resolvedContacts[key.index].posts = posts;
+      } else if (key.type === 'founder' && tempFounderParsed) {
+        founderContact = { ...tempFounderParsed, posts };
+      } else if (key.type === 'marketing' && tempMarketingParsed) {
+        marketingContact = { ...tempMarketingParsed, posts };
+      } else if (key.type === 'company') {
+        companyPosts = posts;
       }
-    }
-    companyPosts = await getCompanyPagePosts(companyName, companyLinkedinUrl);
-
-    // Dynamic enrichment for missing general signals
-    let jobOpenings = enrichedData.jobOpenings || [];
-    if (jobOpenings.length === 0) {
-      console.log(`[Correlate API] Dynamically fetching Jobs for ${companyName}`);
-      const jobResults = await searchExa(`"${companyName}" job openings OR careers page OR "hiring"`, 5);
-      jobOpenings = jobResults
-        .map(r => {
-          let title = r.title || '';
-          // Clean common suffixes and site/job board names from title
-          title = title.replace(/\s*[-|–—•]\s*(LinkedIn|Myworkdayjobs|Careers|Built In|Indeed|Glassdoor|Workday|Jobs|Recruitment|Hiring).*/i, '').trim();
-          return { title, url: r.url };
-        })
-        .filter(job => {
-          const t = job.title.toLowerCase();
-          const c = companyName.toLowerCase();
-          // Filter out generic titles that are just the company name or too short
-          if (t === c || t === 'careers' || t === 'jobs' || t === 'hiring' || t.length < 4) return false;
-          if (t.includes('working at') || t.includes('official site') || t.includes('home page') || t === 'linkedin') return false;
-          return true;
-        });
-      enrichedData.jobOpenings = jobOpenings;
-    }
-
-    let twitterMentions = enrichedData.twitterMentions || [];
-    if (twitterMentions.length === 0) {
-      console.log(`[Correlate API] Dynamically fetching Twitter mentions for ${companyName}`);
-      const twitterResults = await searchExa(`site:twitter.com OR site:x.com "${companyName}"`, 3);
-      twitterMentions = twitterResults.map(r => ({ title: r.title, url: r.url }));
-      enrichedData.twitterMentions = twitterMentions;
-    }
-
-    let redditMentions = enrichedData.redditMentions || [];
-    if (redditMentions.length === 0) {
-      console.log(`[Correlate API] Dynamically fetching Reddit mentions for ${companyName}`);
-      const redditResults = await searchExa(`site:reddit.com "${companyName}"`, 3);
-      redditMentions = redditResults.map(r => ({ title: r.title, url: r.url }));
-      enrichedData.redditMentions = redditMentions;
-    }
-
-    let prMentions = enrichedData.prMentions || [];
-    if (prMentions.length === 0) {
-      console.log(`[Correlate API] Dynamically fetching PR News for ${companyName}`);
-      const prResults = await searchExa(`"${companyName}" (funding news OR product launch OR acquisition OR press release)`, 3);
-      prMentions = prResults.map(r => ({ title: r.title, url: r.url }));
-      enrichedData.prMentions = prMentions;
-    }
+    });
 
     // Merge everything into enrichedData payload for Gemini review
     enrichedData.resolvedContacts = resolvedContacts;
