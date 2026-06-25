@@ -560,7 +560,7 @@ async function handleCorrelateRequest(body) {
       // Fallback synthesis
       const fallback = synthesizeCompanyAccount(companyName, enrichedData, targetDept);
       const finalResponse = prepareCorrelateResponse(fallback, resolvedContacts, founderContact, marketingContact, companyPosts, true, companyName, targetDept, [], [], [], [], enrichedData.autoboundSignals || []);
-      return NextResponse.json(finalResponse);
+      return finalResponse;
     }
 
         const systemPrompt = `You are the world’s elite B2B Go-To-Market (GTM) strategist, corporate intelligence analyst, and master of Account-Based Marketing (ABM).
