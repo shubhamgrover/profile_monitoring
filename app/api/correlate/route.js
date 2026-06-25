@@ -168,13 +168,13 @@ async function handleCorrelateRequest(body) {
     targetDept = body.targetDept || 'Marketing';
     targetSeniority = body.targetSeniority || 'VP';
     const gtmSettings = body.gtmSettings || {};
-    const productName = gtmSettings.productName || 'SignalEngine';
-    const competitors = gtmSettings.competitors || 'traditional ad networks';
-    const productDesc = gtmSettings.productDesc 
-      ? `${productName} (${gtmSettings.productDesc})` 
-      : (body.productDesc || 'SignalEngine B2B tracking tool');
-    const valueProposition = gtmSettings.productDesc 
-      ? `Outperforming competitors like ${competitors} by addressing the specific pain: ${gtmSettings.productDesc}` 
+    const productName = (gtmSettings.productName && gtmSettings.productName.trim() !== '') ? gtmSettings.productName : 'our platform';
+    const competitors = (gtmSettings.competitors && gtmSettings.competitors.trim() !== '') ? gtmSettings.competitors : 'traditional ad networks';
+    const productDesc = (gtmSettings.productDesc && gtmSettings.productDesc.trim() !== '')
+      ? (gtmSettings.productName ? `${gtmSettings.productName} (${gtmSettings.productDesc})` : gtmSettings.productDesc)
+      : (body.productDesc || 'B2B intent signal tracking tool');
+    const valueProposition = (gtmSettings.productDesc && gtmSettings.productDesc.trim() !== '')
+      ? `Outperforming competitors like ${competitors} by addressing the specific pain: ${gtmSettings.productDesc}`
       : (body.valueProposition || 'gives enterprise teams an additional outbound channel and removes dependence on traditional ad spend');
     enrichedData = { ...(body.snapData || {}) };
     
@@ -346,13 +346,13 @@ async function handleCorrelateRequest(body) {
 
     let twitterMentions = enrichedData.twitterMentions || [];
     if (twitterMentions.length === 0) {
-      promises.push(searchExa(`site:twitter.com OR site:x.com "${companyName}"`, 3));
+      promises.push(searchExa(`"${companyName}" twitter posts OR tweet OR X mention`, 3));
       keys.push('twitter');
     }
 
     let redditMentions = enrichedData.redditMentions || [];
     if (redditMentions.length === 0) {
-      promises.push(searchExa(`site:reddit.com "${companyName}"`, 3));
+      promises.push(searchExa(`"${companyName}" reddit discussion OR thread`, 3));
       keys.push('reddit');
     }
 
