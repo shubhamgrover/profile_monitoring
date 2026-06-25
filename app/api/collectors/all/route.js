@@ -12,7 +12,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Company name is required' }, { status: 400 });
     }
 
-    const exaKey = process.env.EXA_API_KEY || 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
+    let exaKey = process.env.EXA_API_KEY;
+    if (!exaKey || exaKey.trim() === '' || exaKey.includes('your_key') || exaKey.includes('placeholder') || exaKey.includes('xxxx') || exaKey === 'undefined' || exaKey === 'null') {
+      exaKey = 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
+    }
     const firecrawlKey = process.env.FIRECRAWL_API_KEY || '';
 
     // If companyName is Unknown, check if we can resolve the company using Exa with profile name or url

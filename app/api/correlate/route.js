@@ -3,7 +3,10 @@ import { synthesizeCompanyAccount, getFrameworkTemplates } from '../../../lib/sy
 
 // Exa search helper
 async function searchExa(query, limit = 2, includeDomains = null) {
-  const exaKey = process.env.EXA_API_KEY || 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
+  let exaKey = process.env.EXA_API_KEY;
+  if (!exaKey || exaKey.trim() === '' || exaKey.includes('your_key') || exaKey.includes('placeholder') || exaKey.includes('xxxx') || exaKey === 'undefined' || exaKey === 'null') {
+    exaKey = 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
+  }
   try {
     const requestBody = {
       query: query,

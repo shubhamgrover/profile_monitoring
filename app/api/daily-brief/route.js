@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import { synthesizeCompanyAccount } from '../../../lib/synthesisEngine';
 
 async function searchExa(query, limit = 2) {
-  const exaKey = process.env.EXA_API_KEY || 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
+  let exaKey = process.env.EXA_API_KEY;
+  if (!exaKey || exaKey.trim() === '' || exaKey.includes('your_key') || exaKey.includes('placeholder') || exaKey.includes('xxxx') || exaKey === 'undefined' || exaKey === 'null') {
+    exaKey = 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
+  }
   try {
     const res = await fetch('https://api.exa.ai/search', {
       method: 'POST',

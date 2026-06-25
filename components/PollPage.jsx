@@ -419,80 +419,100 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
     setLog([]);
     setSignalsFound(0);
 
-    appendLog({ type: 'info', text: `Starting poll for ${activeQueue.length} profiles...` });
-
-    // Dynamically import poller (client-side only)
-    const { pollProfilesBatch } = await import('../lib/poller');
-
-    const allSignals = [];
+    const toPollQueue = [];
     const scrapedItems = [];
+    const allSignals = [];
 
-    const generator = pollProfilesBatch(activeQueue, apiKey, { delayMs: 600 });
+    activeQueue.forEach(item => {
+      const lastPolledDate = item.last_polled || item.lastPolled;
+      const isPolledToday = lastPolledDate && new Date(lastPolledDate).toDateString() === new Date().toDateString();
+      if (isPolledToday) {
+        const prev = (item.snapshots && item.snapshots.length > 0) ? item.snapshots[item.snapshots.length - 1] : {};
+        scrapedItems.push({ profile: item, snapshot: prev, prev });
+        const prevSignals = detectSignals(item, (item.snapshots && item.snapshots.length > 1) ? item.snapshots[item.snapshots.length - 2] : {}, prev);
+        allSignals.push(...prevSignals);
+        setSignalsFound(prevVal => prevVal + prevSignals.length);
+        appendLog({ type: 'info', text: `ℹ️ Profile "${item.name}" was already polled today. Skipping scraping.` });
+      } else {
+        toPollQueue.push(item);
+      }
+    });
 
-    for await (const update of generator) {
-      if (update.type === 'progress') {
-        setProgress(update.pct);
-        appendLog({ type: 'info', text: `Polling LinkedIn profile ${update.profileName}... (${update.current}/${update.total})` });
-      } else if (update.type === 'success') {
-        try {
-          const prev = (update.profile?.snapshots && update.profile?.snapshots[update.profile.snapshots.length - 1]) || {};
-          const snapshot = {
-            ...prev,
-            ...update.snapshot
-          };
+    appendLog({ type: 'info', text: `Starting poll for ${toPollQueue.length} profiles...` });
 
-          // Run baseline LinkedIn signal detection
-          const linkedinSignals = detectSignals(update.profile, prev, snapshot);
-          if (linkedinSignals.length > 0) {
-            linkedinSignals.forEach(s => {
-              appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.profile}` });
-            });
-            allSignals.push(...linkedinSignals);
-            setSignalsFound(prevVal => prevVal + linkedinSignals.length);
-          } else {
-            if (snapshot.isPrivateProfile) {
-              appendLog({ type: 'info', text: `🔒 ${update.profile?.name} — Profile is private (monitoring company instead)` });
-            } else {
-              appendLog({ type: 'success', text: `✓ ${update.profile?.name} — LinkedIn baseline checked` });
-            }
-          }
+    if (toPollQueue.length > 0) {
+      // Dynamically import poller (client-side only)
+      const { pollProfilesBatch } = await import('../lib/poller');
 
-          // Update the profile in Supabase to active immediately
+      const generator = pollProfilesBatch(toPollQueue, apiKey, { delayMs: 600 });
+
+      for await (const update of generator) {
+        if (update.type === 'progress') {
+          setProgress(update.pct);
+          appendLog({ type: 'info', text: `Polling LinkedIn profile ${update.profileName}... (${update.current}/${update.total})` });
+        } else if (update.type === 'success') {
           try {
-            const currentSnapshots = update.profile?.snapshots || [];
-            const updatePayload = {
-              status: 'active',
-              last_polled: new Date().toISOString(),
-              snapshots: [...currentSnapshots, snapshot]
+            const prev = (update.profile?.snapshots && update.profile?.snapshots[update.profile.snapshots.length - 1]) || {};
+            const snapshot = {
+              ...prev,
+              ...update.snapshot
             };
-            if (!update.profile?.company || update.profile.company === 'Unknown' || update.profile.company === '') {
-              if (snapshot.currentCompany) {
-                updatePayload.company = snapshot.currentCompany;
-                update.profile.company = snapshot.currentCompany;
+
+            // Run baseline LinkedIn signal detection
+            const linkedinSignals = detectSignals(update.profile, prev, snapshot);
+            if (linkedinSignals.length > 0) {
+              linkedinSignals.forEach(s => {
+                appendLog({ type: 'signal', text: `${s.emoji} SIGNAL: ${s.label} — ${s.profile}` });
+              });
+              allSignals.push(...linkedinSignals);
+              setSignalsFound(prevVal => prevVal + linkedinSignals.length);
+            } else {
+              if (snapshot.isPrivateProfile) {
+                appendLog({ type: 'info', text: `🔒 ${update.profile?.name} — Profile is private (monitoring company instead)` });
+              } else {
+                appendLog({ type: 'success', text: `✓ ${update.profile?.name} — LinkedIn baseline checked` });
               }
             }
-            const { error } = await supabase
-              .from('profiles')
-              .update(updatePayload)
-              .eq('id', update.profile?.id);
-            if (error) throw error;
 
-            scrapedItems.push({ profile: update.profile, snapshot, prev });
+            // Update the profile in Supabase to active immediately
+            try {
+              const currentSnapshots = update.profile?.snapshots || [];
+              const updatePayload = {
+                status: 'active',
+                last_polled: new Date().toISOString(),
+                snapshots: [...currentSnapshots, snapshot]
+              };
+              if (!update.profile?.company || update.profile.company === 'Unknown' || update.profile.company === '') {
+                if (snapshot.currentCompany) {
+                  updatePayload.company = snapshot.currentCompany;
+                  update.profile.company = snapshot.currentCompany;
+                }
+              }
+              const { error } = await supabase
+                .from('profiles')
+                .update(updatePayload)
+                .eq('id', update.profile?.id);
+              if (error) throw error;
+
+              scrapedItems.push({ profile: update.profile, snapshot, prev });
+            } catch (err) {
+              console.error("Error updating profile status in Supabase:", err);
+            }
           } catch (err) {
-            console.error("Error updating profile status in Supabase:", err);
+            appendLog({ type: 'info', text: `⚠ Error processing profile ${update.profileName}: ${err.message}` });
+            console.error("Error processing successful profile scrape:", err);
           }
-        } catch (err) {
-          appendLog({ type: 'info', text: `⚠ Error processing profile ${update.profileName}: ${err.message}` });
-          console.error("Error processing successful profile scrape:", err);
+
+        } else if (update.type === 'error') {
+          appendLog({ type: 'info', text: `⚠ ${update.profileName} — ${update.error}` });
+        } else if (update.type === 'done') {
+          appendLog({ type: 'info', text: `LinkedIn baseline check complete. Starting company enrichment...` });
         }
-
-      } else if (update.type === 'error') {
-        appendLog({ type: 'info', text: `⚠ ${update.profileName} — ${update.error}` });
-      } else if (update.type === 'done') {
-        appendLog({ type: 'info', text: `LinkedIn baseline check complete. Starting company enrichment...` });
       }
+    } else {
+      setProgress(100);
+      appendLog({ type: 'info', text: `LinkedIn baseline check complete. Starting company enrichment...` });
     }
-
     // Run deferred external enrichment for unique companies
     const extSignals = await enrichCompanies(scrapedItems);
     allSignals.push(...extSignals);

@@ -242,6 +242,39 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
           </button>
         </div>
       </div>
+
+      {/* Pending Profiles Nudge Banner */}
+      {profiles.some(p => p.status === 'pending') && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(255, 42, 0, 0.05) 0%, rgba(245, 158, 11, 0.05) 100%)',
+          border: '1px solid rgba(255, 42, 0, 0.25)',
+          padding: '16px 20px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 24 }}>⏳</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#132D7D' }}>
+                You have new profiles pending analysis!
+              </div>
+              <div style={{ fontSize: 12, color: '#666666', marginTop: 2 }}>
+                We've queued {profiles.filter(p => p.status === 'pending').length} uploaded profile(s). Run a poll now to extract B2B buying signals, identify decision makers, and generate tailored outreach playbooks.
+              </div>
+            </div>
+          </div>
+          <button 
+            className="btn btn-primary" 
+            style={{ padding: '8px 16px', fontSize: 12, background: '#FF2A00', border: 'none', color: '#FFFFFF', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer' }}
+            onClick={() => onNavigate('poll')}
+          >
+            ⚡ Start Poll Now
+          </button>
+        </div>
+      )}
       {/* GTM Setup & Sales Positioning Panel */}
       <div style={{
         background: '#F8F9FA',
