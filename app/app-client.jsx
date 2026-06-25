@@ -111,21 +111,9 @@ export default function App() {
         if (trackersRes.error) throw trackersRes.error;
         if (logsRes.error) throw logsRes.error;
 
-        // Merge DB profiles with REAL_PROFILES: DB wins if same id exists, else REAL_PROFILES fills gaps
-        const dbProfileIds = new Set((profilesRes.data || []).map(p => p.id));
-        const mergedProfiles = [
-          ...(profilesRes.data || []).map(mapProfile),
-          ...REAL_PROFILES.filter(rp => !dbProfileIds.has(rp.id))
-        ];
-        setProfiles(mergedProfiles);
-
-        // Merge DB signals with REAL_SIGNALS: DB wins on id collision
-        const dbSignalIds = new Set((signalsRes.data || []).map(s => s.id));
-        const mergedSignals = [
-          ...(signalsRes.data || []).map(mapSignal),
-          ...REAL_SIGNALS.filter(rs => !dbSignalIds.has(rs.id))
-        ];
-        setSignals(mergedSignals);
+        // If user is logged in, show only their DB profiles and signals (blank slate if empty)
+        setProfiles((profilesRes.data || []).map(mapProfile));
+        setSignals((signalsRes.data || []).map(mapSignal));
         setVisitorLogs(logsRes.data || []);
 
         let currentTrackerId = null;
@@ -173,18 +161,9 @@ export default function App() {
       if (signalsRes.error) throw signalsRes.error;
       if (logsRes.error) throw logsRes.error;
 
-      // Re-merge with REAL_PROFILES / REAL_SIGNALS to preserve snapshot data
-      const dbProfileIds = new Set((profilesRes.data || []).map(p => p.id));
-      setProfiles([
-        ...(profilesRes.data || []).map(mapProfile),
-        ...REAL_PROFILES.filter(rp => !dbProfileIds.has(rp.id))
-      ]);
-
-      const dbSignalIds = new Set((signalsRes.data || []).map(s => s.id));
-      setSignals([
-        ...(signalsRes.data || []).map(mapSignal),
-        ...REAL_SIGNALS.filter(rs => !dbSignalIds.has(rs.id))
-      ]);
+      // Set database-only records
+      setProfiles((profilesRes.data || []).map(mapProfile));
+      setSignals((signalsRes.data || []).map(mapSignal));
       setVisitorLogs(logsRes.data || []);
     } catch (err) {
       console.error("Error refreshing Supabase state:", err);

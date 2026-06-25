@@ -24,6 +24,15 @@ export default function OnboardingWizard({ onSave, onClose }) {
     };
     
     localStorage.setItem('onboarding_settings', JSON.stringify(settings));
+    
+    // Sync with watchlist GTM settings
+    const gtmSettings = {
+      productName: '',
+      productDesc: `${productDesc}\n\nValue Proposition: ${valueProposition}`,
+      competitors: ''
+    };
+    localStorage.setItem('gtm_product_settings', JSON.stringify(gtmSettings));
+
     onSave(settings);
     onClose();
   };

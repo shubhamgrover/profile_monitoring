@@ -19,10 +19,17 @@ export default function Auth() {
 
     try {
       if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
+        const redirectUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const signUpOptions = {
           email,
           password,
-        });
+        };
+        if (redirectUrl) {
+          signUpOptions.options = {
+            emailRedirectTo: redirectUrl
+          };
+        }
+        const { data, error } = await supabase.auth.signUp(signUpOptions);
         if (error) throw error;
         setSuccessMsg('Sign-up successful! Please check your email for the confirmation link.');
       } else {
