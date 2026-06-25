@@ -194,9 +194,9 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
     if (search) {
       const q = search.toLowerCase();
       if (
-        !row.name.toLowerCase().includes(q) &&
-        !row.company.toLowerCase().includes(q) &&
-        !row.title.toLowerCase().includes(q)
+        !(row.name || '').toLowerCase().includes(q) &&
+        !(row.company || '').toLowerCase().includes(q) &&
+        !(row.title || '').toLowerCase().includes(q)
       ) return false;
     }
     return true;

@@ -259,7 +259,7 @@ export default function App() {
 
       const freshIds = new Set(newSignals.map(s => s.id));
       setRecentSignalIds(freshIds);
-      setPage('dashboard');
+      setPage('brief');
       if (newSignals.length > 0) {
         showToast(`🚀 ${newSignals.length} new signal${newSignals.length > 1 ? 's' : ''} detected!`);
       }

@@ -70,54 +70,88 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
       // Look for a profile with a valid company LinkedIn URL
       const profileWithDomain = profilesInCompany.find(p => p.profile.companyLinkedinUrl) || profilesInCompany[0];
 
-      appendLog({ type: 'info', text: `🌐 Researching "${company}" (${cIdx + 1}/${uniqueCompanies.length})...` });
+      // Check if this company was already researched today
+      const isCompanyPolledToday = profilesInCompany.some(p => {
+        const lastPolledDate = p.profile.lastPolled || p.profile.last_polled;
+        if (!lastPolledDate) return false;
+        return new Date(lastPolledDate).toDateString() === new Date().toDateString();
+      });
 
       try {
-        const extRes = await fetch('/api/collectors/all', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            companyName: company,
-            companyDomain: profileWithDomain.profile.companyLinkedinUrl ? '' : '',
-            profileUrl: profileWithDomain.profile.linkedinUrl,
-            profileName: profileWithDomain.profile.name
-          }),
-        });
+        let extData = null;
 
-        if (!extRes.ok) {
-          throw new Error(`status ${extRes.status}`);
+        if (isCompanyPolledToday) {
+          appendLog({ type: 'info', text: `ℹ️ Skip: Company "${company}" was already polled today. Using cache.` });
+          const prev = profileWithDomain.prev || {};
+          extData = {
+            sitemapLinks: prev.sitemapLinks || [],
+            youtubeVideos: prev.youtubeVideos || [],
+            jobOpenings: prev.jobOpenings || [],
+            prMentions: prev.prMentions || [],
+            redditMentions: prev.redditMentions || [],
+            twitterMentions: prev.twitterMentions || [],
+            companyLinkedinUrl: profileWithDomain.profile.companyLinkedinUrl || prev.companyLinkedinUrl || '',
+            resolvedCompany: company,
+            resolvedDomain: profileWithDomain.profile.domain || prev.resolvedDomain || '',
+            companyPosts: prev.posts || [],
+            autoboundSignals: prev.autoboundSignals || [],
+          };
+        } else {
+          appendLog({ type: 'info', text: `🌐 Researching "${company}" (${cIdx + 1}/${uniqueCompanies.length})...` });
+          const extRes = await fetch('/api/collectors/all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              companyName: company,
+              companyDomain: profileWithDomain.profile.companyLinkedinUrl ? '' : '',
+              profileUrl: profileWithDomain.profile.linkedinUrl,
+              profileName: profileWithDomain.profile.name
+            }),
+          });
+
+          if (!extRes.ok) {
+            throw new Error(`status ${extRes.status}`);
+          }
+
+          extData = await extRes.json();
         }
-
-        const extData = await extRes.json();
         
         if (extData) {
-          appendLog({ type: 'success', text: `✓ Completed research for "${extData.resolvedCompany || company}"` });
+          if (!isCompanyPolledToday) {
+            appendLog({ type: 'success', text: `✓ Completed research for "${extData.resolvedCompany || company}"` });
+          }
 
           // Fetch alternative buying committee contacts using Exa
           let alternateContacts = [];
-          try {
-            const bcRes = await fetch('/api/collectors/buying-committee', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ companyName: extData.resolvedCompany || company, department: targetDept, seniority: targetSeniority })
-            });
-            if (bcRes.ok) {
-              const bcData = await bcRes.json();
-              alternateContacts = bcData.contacts || [];
-              if (alternateContacts.length > 0) {
-                appendLog({ type: 'success', text: `  └ 👥 Discovered contacts: ${alternateContacts.length} people` });
+          if (!isCompanyPolledToday) {
+            try {
+              const bcRes = await fetch('/api/collectors/buying-committee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyName: extData.resolvedCompany || company, department: targetDept, seniority: targetSeniority })
+              });
+              if (bcRes.ok) {
+                const bcData = await bcRes.json();
+                alternateContacts = bcData.contacts || [];
+                if (alternateContacts.length > 0) {
+                  appendLog({ type: 'success', text: `  └ 👥 Discovered contacts: ${alternateContacts.length} people` });
+                }
               }
+            } catch (bcErr) {
+              console.error(`Failed to fetch buying committee for ${company}:`, bcErr);
             }
-          } catch (bcErr) {
-            console.error(`Failed to fetch buying committee for ${company}:`, bcErr);
+          } else {
+            alternateContacts = profileWithDomain.prev?.alternateContacts || [];
           }
           
           // Update sitemap links, YouTube, job openings, etc. in snapshots
-          if (extData.sitemapLinks && extData.sitemapLinks.length > 0) {
-            appendLog({ type: 'success', text: `  └ 🌐 Mapped sitemaps: ${extData.sitemapLinks.length} URLs` });
-          }
-          if (extData.jobOpenings && extData.jobOpenings.length > 0) {
-            appendLog({ type: 'success', text: `  └ 💼 Mapped job openings: ${extData.jobOpenings.length} vacancies` });
+          if (!isCompanyPolledToday) {
+            if (extData.sitemapLinks && extData.sitemapLinks.length > 0) {
+              appendLog({ type: 'success', text: `  └ 🌐 Mapped sitemaps: ${extData.sitemapLinks.length} URLs` });
+            }
+            if (extData.jobOpenings && extData.jobOpenings.length > 0) {
+              appendLog({ type: 'success', text: `  └ 💼 Mapped job openings: ${extData.jobOpenings.length} vacancies` });
+            }
           }
 
           // Build a temporary snapshot representation to send to the correlation engine
@@ -145,6 +179,15 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
           let preFetchedSynthesis = null;
           try {
             appendLog({ type: 'info', text: `  └ 🧠 Pre-fetching strategic correlations & templates...` });
+            let gtmSettings = {};
+            if (typeof window !== 'undefined') {
+              try {
+                const stored = localStorage.getItem('gtm_product_settings');
+                if (stored) gtmSettings = JSON.parse(stored);
+              } catch (e) {
+                console.error('Failed to load GTM settings in PollPage:', e);
+              }
+            }
             const corrRes = await fetch('/api/correlate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -153,7 +196,8 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
                 domain: extData.resolvedDomain || '',
                 snapData: tempSnapData,
                 targetDept,
-                targetSeniority
+                targetSeniority,
+                gtmSettings
               })
             });
             if (corrRes.ok) {
@@ -472,15 +516,6 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
     <>
       <div className="topbar">
         <div className="topbar-title">Run Signal Poll</div>
-        <div className="topbar-right">
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowApiModal(true)}
-            id="set-api-key-btn"
-          >
-            🔑 {apiKey ? 'Change API Key' : 'Set API Key'}
-          </button>
-        </div>
       </div>
 
       <div className="page-content">
@@ -573,13 +608,7 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
                 fontSize: 13,
                 color: 'var(--signal-yellow)',
               }}>
-                ⚠️ No API key set — running in <strong>demo mode</strong> with simulated signals.{' '}
-                <button
-                  onClick={() => setShowApiModal(true)}
-                  style={{ color: 'inherit', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}
-                >
-                  Add your ScrapeCreators API key
-                </button>{' '}to poll real LinkedIn profiles.
+                ⚠️ No API key set — running in <strong>demo mode</strong> with simulated signals. Add your ScrapeCreators API key in the environment to poll real LinkedIn profiles.
               </div>
             )}
 
@@ -617,17 +646,31 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
           )}
 
           {done && (
-            <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
-              <button
-                className="btn btn-primary"
-                onClick={() => onNavigate('dashboard')}
-                id="view-signals-btn"
-              >
-                View Signals →
-              </button>
-              <button className="btn btn-secondary" onClick={handleStartPoll}>
-                Run Again
-              </button>
+            <div style={{
+              marginTop: 20,
+              padding: 24,
+              background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              borderRadius: 'var(--radius-lg)',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>🎉</div>
+              <h3 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>Success! Profiles are live.</h3>
+              <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)', fontSize: 14 }}>
+                Signal detection is complete. The target profiles have been successfully mapped and enriched. You can now monitor them in your dashboard.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => onNavigate('brief')}
+                  id="view-signals-btn"
+                >
+                  View Opportunity Dashboard →
+                </button>
+                <button className="btn btn-secondary" onClick={handleStartPoll}>
+                  Run Another Poll
+                </button>
+              </div>
             </div>
           )}
         </div>
