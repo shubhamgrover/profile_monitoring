@@ -79,6 +79,9 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setLoadingSession(false);
+      if (!session) {
+        setLandingView(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -298,11 +301,13 @@ export default function App() {
     );
   }
 
-  // If the user is not authenticated, render the landing page or login/registration page
+  // If landingView is true, always render LandingPage first (for public access)
+  if (landingView) {
+    return <LandingPage onGetStarted={() => setLandingView(false)} />;
+  }
+
+  // If landingView is false and user is not authenticated, render login/registration page
   if (!session) {
-    if (landingView) {
-      return <LandingPage onGetStarted={() => setLandingView(false)} />;
-    }
     return <Auth onBackToHome={() => setLandingView(true)} />;
   }
 
