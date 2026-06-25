@@ -1080,11 +1080,10 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
     : (alternateContact?.title || synthesis?.resolvedContacts?.[0]?.title || 'Target Stakeholder'));
   
   const contactUrl = synthesis?.recommendedContact?.url || alternateContact?.url || primaryContact?.profileLinkedinUrl || primaryContact?.linkedinUrl || 'https://www.linkedin.com';
-
   useEffect(() => {
-    // If we have a cached result in client state or pre-fetched in database snapshot, use it immediately
+    // If we have a fully resolved, non-fallback cached result in client state or pre-fetched in database snapshot, use it immediately
     const cached = correlateCache[cacheKey] || snapData.synthesis;
-    if (cached) {
+    if (cached && !cached.isFallback && cached.strategicCorrelations && cached.strategicCorrelations.length > 0) {
       setSynthesis(cached);
       if (cached.recommendedFrameworkId) setSelectedFrameworkId(cached.recommendedFrameworkId);
       setAutoboundSignals(cached.autoboundSignals || snapData.autoboundSignals || []);
