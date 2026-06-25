@@ -111,7 +111,7 @@ export async function POST(request) {
 
           const { error: upsertErr } = await supabase
             .from('profiles')
-            .upsert(record, { onConflict: 'linkedin_url' });
+            .upsert(record, { onConflict: 'user_id,linkedin_url' });
 
           if (upsertErr) {
             console.error('[Buying Committee] Error upserting scraped profile to Supabase:', upsertErr.message);

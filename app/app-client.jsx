@@ -206,7 +206,7 @@ export default function App() {
 
       const { error } = await supabase
         .from('profiles')
-        .upsert(records, { onConflict: 'linkedin_url' });
+        .upsert(records, { onConflict: 'user_id,linkedin_url' });
 
       if (error) throw error;
 
