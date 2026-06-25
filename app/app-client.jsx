@@ -52,6 +52,21 @@ export default function App() {
     }
   }, []);
 
+  // Persist target settings when changed
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('onboarding_settings');
+      let current = stored ? JSON.parse(stored) : {};
+      if (current.targetDept !== targetDept || current.targetSeniority !== targetSeniority) {
+        current.targetDept = targetDept;
+        current.targetSeniority = targetSeniority;
+        localStorage.setItem('onboarding_settings', JSON.stringify(current));
+      }
+    } catch (e) {
+      console.error('Failed to sync target settings:', e);
+    }
+  }, [targetDept, targetSeniority]);
+
   // Listen for Authentication state changes
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -201,7 +216,7 @@ export default function App() {
       await refreshData();
     } catch (err) {
       console.error("Error saving uploaded profiles:", err.message);
-      showToast("⚠️ Failed to save uploaded profiles");
+      showToast(`⚠️ Failed to save: ${err.message}`);
     }
   };
 
