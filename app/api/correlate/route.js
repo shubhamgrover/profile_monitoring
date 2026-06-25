@@ -559,7 +559,7 @@ async function handleCorrelateRequest(body) {
     if (!apiKey) {
       // Fallback synthesis
       const fallback = synthesizeCompanyAccount(companyName, enrichedData, targetDept);
-      const finalResponse = prepareCorrelateResponse(fallback, resolvedContacts, founderContact, marketingContact, companyPosts, true, companyName, targetDept, [], [], [], [], enrichedData.autoboundSignals || []);
+      const finalResponse = prepareCorrelateResponse(fallback, resolvedContacts, founderContact, marketingContact, companyPosts, true, companyName, targetDept, jobOpenings, prMentions, redditMentions, twitterMentions, enrichedData.autoboundSignals || []);
       return finalResponse;
     }
 
