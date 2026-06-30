@@ -649,6 +649,7 @@ YOUR STRATEGIC STRATEGY & EXPORT BLUEPRINT:
 Analyze the payload below and deliver a hyper-sharp, non-obvious B2B intelligence brief structured into three distinct layers. Avoid generic fluff like "they want to scale." Focus on highly leveraged, actionable business realities. Make sure observations are crisp and directly help the sales team correlate what is happening.
 
 CRITICAL INSTRUCTIONS FOR CORRELATIONS AND OUTBOUND PITCH:
+- The outreach script [P] MUST pitch our solution ("${productDesc}") and target their pain using our exact value proposition ("${valueProposition}"). Do NOT invent other capabilities or describe our product as an audience intent tracking tool unless it aligns with what we sell. If we sell a Google Ads alternative or ad-spend reduction tool, pitch exactly that (i.e. replacing paid search ads, capturing intent organically to save ad budgets) rather than general market research.
 - NEVER mention the names of third-party APIs or internal developer tools like "Autobound", "Exa", or "ScrapeCreators". Refer to them simply as "Intent Signal", "Web Intelligence", "Search Activity", or "Signal".
 - DO NOT invent, assume, or hallucinate signals (such as "search activity for CRM" or "sales enablement tooling") that are not explicitly provided in the raw input data. Every correlation must be strictly grounded in the actual input signals list.
 - DO NOT generate vague, abstract, or generic correlations (e.g. "Since sitemaps exist, it means they are launching products").
