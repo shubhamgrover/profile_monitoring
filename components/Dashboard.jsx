@@ -920,9 +920,24 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   const cacheKey = `${group.company}|${targetDept}|${targetSeniority}`;
   const [activeTab, setActiveTab]         = useState('correlations');
   const [postsSubTab, setPostsSubTab]     = useState('contacts');
+  const isFallbackSynthesis = (s) => {
+    if (!s) return true;
+    if (s.isFallback === true) return true;
+    const fallbackConclusions = [
+      'New Product Launch & Technical Scaling',
+      'Capital Deployment & Rapid Team Scaling',
+      'Active Media & Content Campaign Push',
+      'Active Recruitment & Team Growth',
+      'Active Social & Brand Authority Drive',
+      'Steady operations',
+      'Steady operations with standard maintenance'
+    ];
+    return fallbackConclusions.includes(s.conclusion);
+  };
+
   const [synthesis, setSynthesis]         = useState(() => {
     const initCached = correlateCache[cacheKey] || snapData.synthesis || group.synthesis;
-    return (initCached && !initCached.isFallback) ? initCached : null;
+    return (initCached && !isFallbackSynthesis(initCached)) ? initCached : null;
   });
   const [loadingAI, setLoadingAI]         = useState(false);
   const [autoboundSignals, setAutoboundSignals] = useState(snapData.autoboundSignals || []);
@@ -1087,7 +1102,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   useEffect(() => {
     // If we have a fully resolved, non-fallback cached result in client state or pre-fetched in database snapshot, use it immediately
     const cached = correlateCache[cacheKey] || (refreshTrigger === 0 ? snapData.synthesis : null);
-    if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0 && !cached.isFallback) {
+    if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0 && !isFallbackSynthesis(cached)) {
       setSynthesis(cached);
       if (cached.recommendedFrameworkId) setSelectedFrameworkId(cached.recommendedFrameworkId);
       setAutoboundSignals(cached.autoboundSignals || snapData.autoboundSignals || []);
