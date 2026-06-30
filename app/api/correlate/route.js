@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { synthesizeCompanyAccount, getFrameworkTemplates } from '../../../lib/synthesisEngine';
 
 // Exa search helper
-async function searchExa(query, limit = 2, includeDomains = null) {
+async function searchExa(query, limit = 2, includeDomains = null, startPublishedDate = null) {
   let exaKey = process.env.EXA_API_KEY;
   if (!exaKey || exaKey.trim() === '' || exaKey.includes('your_key') || exaKey.includes('placeholder') || exaKey.includes('xxxx') || exaKey === 'undefined' || exaKey === 'null') {
     exaKey = 'a0c81fe8-4433-4a01-9dc5-ba02492cf921';
@@ -14,6 +14,9 @@ async function searchExa(query, limit = 2, includeDomains = null) {
     };
     if (includeDomains) {
       requestBody.includeDomains = includeDomains;
+    }
+    if (startPublishedDate) {
+      requestBody.startPublishedDate = startPublishedDate;
     }
     const res = await fetch('https://api.exa.ai/search', {
       method: 'POST',
@@ -385,27 +388,31 @@ async function handleCorrelateRequest(body) {
       keys.push('companyLinkedin');
     }
 
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const dateLimit = oneYearAgo.toISOString();
+
     let jobOpenings = enrichedData.jobOpenings || [];
     if (jobOpenings.length === 0) {
-      promises.push(searchExa(`"${companyName}" job openings OR careers page OR "hiring"`, 5));
+      promises.push(searchExa(`"${companyName}" job openings OR careers page OR "hiring"`, 5, null, dateLimit));
       keys.push('jobs');
     }
 
     let twitterMentions = enrichedData.twitterMentions || [];
     if (twitterMentions.length === 0) {
-      promises.push(searchExa(`"${companyName}" twitter posts OR tweet OR X mention`, 3));
+      promises.push(searchExa(`"${companyName}" twitter posts OR tweet OR X mention`, 3, null, dateLimit));
       keys.push('twitter');
     }
 
     let redditMentions = enrichedData.redditMentions || [];
     if (redditMentions.length === 0) {
-      promises.push(searchExa(`"${companyName}" reddit discussion OR thread`, 3));
+      promises.push(searchExa(`"${companyName}" reddit discussion OR thread`, 3, null, dateLimit));
       keys.push('reddit');
     }
 
     let prMentions = enrichedData.prMentions || [];
     if (prMentions.length === 0) {
-      promises.push(searchExa(`"${companyName}" (funding news OR product launch OR acquisition OR press release)`, 3));
+      promises.push(searchExa(`"${companyName}" (funding news OR product launch OR acquisition OR press release)`, 3, null, dateLimit));
       keys.push('pr');
     }
 
@@ -672,21 +679,21 @@ For the top decision-makers surfaced, construct a tailored sales entry point (U)
 Outline how to surround this account with marketing assets to prime them for sales outreach.
 
 You MUST respond ONLY with a valid JSON object matching this schema. Do not include markdown code block syntax (like \`\`\`json) or any conversational text.
-CRITICAL EMAIL FORMAT RULE: All email frameworks under the "frameworks" list MUST be **generic in nature** and follow the exact format below. They must NEVER mention our company name (SignalEngine) or describe specific proprietary product features. 
+CRITICAL EMAIL FORMAT RULE: All email frameworks under the "frameworks" list MUST be **fully populated with actual content** (do not output literal placeholders or bracket variables like [X], [Y], [A], [B], [C], or [Your Name]). They must NEVER mention our company name (SignalEngine) or describe specific proprietary product features. 
 
-The email body must look EXACTLY like this:
+The email body must look like this, but with all bracketed variables filled in with actual target details:
 Hi {{first_name}},
 
-Saw [X] (observed trigger event like their recent post, hiring surge, or news).
+Saw [actual trigger event from their recent posts, hiring, or news].
 
-This generally means [Y] (logical implication / challenge).
+This generally means [actual business challenge or implication resolved by our value proposition].
 
-We have done this for [A], [B], [C] (provide 2-3 similar past reference companies like Atlys, CogniSwitch, or Dentsu).
+We have done this for [mention 2-3 real similar reference companies or competitors like Atlys, Dentsu, etc.].
 
 Worth a quick chat?
 
 Best,
-[Your Name]
+%signature%
 
 JSON Schema:
 {
