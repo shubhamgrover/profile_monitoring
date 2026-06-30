@@ -920,7 +920,10 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   const cacheKey = `${group.company}|${targetDept}|${targetSeniority}`;
   const [activeTab, setActiveTab]         = useState('correlations');
   const [postsSubTab, setPostsSubTab]     = useState('contacts');
-  const [synthesis, setSynthesis]         = useState(() => correlateCache[cacheKey] || snapData.synthesis || group.synthesis);
+  const [synthesis, setSynthesis]         = useState(() => {
+    const initCached = correlateCache[cacheKey] || snapData.synthesis || group.synthesis;
+    return (initCached && !initCached.isFallback) ? initCached : null;
+  });
   const [loadingAI, setLoadingAI]         = useState(false);
   const [autoboundSignals, setAutoboundSignals] = useState(snapData.autoboundSignals || []);
   const [copiedEmail, setCopiedEmail]     = useState(false);
@@ -1084,7 +1087,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   useEffect(() => {
     // If we have a fully resolved, non-fallback cached result in client state or pre-fetched in database snapshot, use it immediately
     const cached = correlateCache[cacheKey] || (refreshTrigger === 0 ? snapData.synthesis : null);
-    if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0) {
+    if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0 && !cached.isFallback) {
       setSynthesis(cached);
       if (cached.recommendedFrameworkId) setSelectedFrameworkId(cached.recommendedFrameworkId);
       setAutoboundSignals(cached.autoboundSignals || snapData.autoboundSignals || []);
