@@ -58,7 +58,7 @@ async function getScrapeCreatorsPosts(linkedinUrl) {
   try {
     const res = await fetch(`https://api.scrapecreators.com/v1/linkedin/profile?url=${encodeURIComponent(linkedinUrl)}`, {
       headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(3500)
     });
     if (res.ok) {
       const data = await res.json();
@@ -133,7 +133,7 @@ async function getCompanyPagePosts(companyName, companyLinkedinUrl) {
   try {
     const res = await fetch(`https://api.scrapecreators.com/v1/linkedin/company?url=${encodeURIComponent(targetUrl)}`, {
       headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(3500)
     });
     if (res.ok) {
       const data = await res.json();
