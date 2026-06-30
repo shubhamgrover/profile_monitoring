@@ -559,8 +559,8 @@ async function handleCorrelateRequest(body) {
     const postPromises = [];
     const postKeys = [];
 
-    // resolvedContacts posts
-    resolvedContacts.forEach((c, idx) => {
+    // resolvedContacts posts (only fetch for the first/primary contact to prevent Vercel 10s timeout)
+    resolvedContacts.slice(0, 1).forEach((c, idx) => {
       postPromises.push(getScrapeCreatorsPosts(c.url));
       postKeys.push({ type: 'contact', index: idx });
     });
