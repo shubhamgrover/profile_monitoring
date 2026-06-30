@@ -150,6 +150,53 @@ async function getCompanyPagePosts(companyName, companyLinkedinUrl) {
   return [];
 }
 
+// Helper to filter out past/retired employees
+function isCurrentEmployee(r, companyName) {
+  if (!r) return false;
+  
+  // If the title contains "former", "ex-", "ex ", "past", "retired", "previous", "was", etc., reject immediately
+  const title = (r.title || '').toLowerCase();
+  if (/\b(former|ex-|ex\b|past|retired|previous|was)\b/i.test(title)) {
+    return false;
+  }
+
+  if (!r.entities?.[0]?.properties) return true; // fallback to true if no entity data is present
+  const props = r.entities[0].properties;
+  if (!props.workHistory || props.workHistory.length === 0) return true; // trust rank if no history parsed
+  
+  // Find if there is any active (no end date) work history for this company
+  return props.workHistory.some(h => {
+    const cName = h.company?.name || '';
+    const isCompanyMatch = cName.toLowerCase().includes(companyName.toLowerCase()) || 
+                           companyName.toLowerCase().includes(cName.toLowerCase());
+    const isCurrent = !h.dates?.to; // if "to" date is not set, it is current
+    return isCompanyMatch && isCurrent;
+  });
+}
+
+// Helper to translate foreign language posts to English using Gemini
+async function translateIfNeeded(text, apiKey) {
+  if (!text || !/[\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/.test(text) || !apiKey) return text;
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `Translate the following foreign language LinkedIn update to plain English. Do not add any conversational text or comments, return only the direct English translation:\n\n${text}` }] }]
+      }),
+      signal: AbortSignal.timeout(6000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const translated = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (translated) return translated.trim();
+    }
+  } catch (e) {
+    console.error('Translation failed:', e);
+  }
+  return text;
+}
+
 const inFlight = new Map();
 
 async function handleCorrelateRequest(body) {
@@ -323,13 +370,13 @@ async function handleCorrelateRequest(body) {
     const promises = [];
     const keys = [];
 
-    promises.push(searchExa(contactsQuery, 2, ['linkedin.com']));
+    promises.push(searchExa(contactsQuery, 4, ['linkedin.com']));
     keys.push('contacts');
 
-    promises.push(searchExa(founderQuery, 1, ['linkedin.com']));
+    promises.push(searchExa(founderQuery, 3, ['linkedin.com']));
     keys.push('founder');
 
-    promises.push(searchExa(marketingQuery, 1, ['linkedin.com']));
+    promises.push(searchExa(marketingQuery, 3, ['linkedin.com']));
     keys.push('marketing');
 
     let companyLinkedinUrl = enrichedData.companyLinkedinUrl || enrichedData.linkedinUrl || '';
@@ -391,6 +438,7 @@ async function handleCorrelateRequest(body) {
           const c = companyName.toLowerCase();
           if (t === c || t === 'careers' || t === 'jobs' || t === 'hiring' || t.length < 4) return false;
           if (t.includes('working at') || t.includes('official site') || t.includes('home page') || t === 'linkedin') return false;
+          if (t.includes('careers and employment') || t.includes('explore job opportunity') || t.endsWith('careers') || t.includes('job opportunities') || t.includes('careers portal') || t.includes('working here') || t.includes('explore jobs')) return false;
           return true;
         });
       enrichedData.jobOpenings = jobOpenings;
@@ -495,7 +543,10 @@ async function handleCorrelateRequest(body) {
       });
     };
 
-    resolvedContacts = exaContacts.map(r => {
+    let currentContacts = exaContacts.filter(r => isCurrentEmployee(r, companyName));
+    if (currentContacts.length === 0) currentContacts = exaContacts; // fallback to unfiltered if empty
+    
+    resolvedContacts = currentContacts.map(r => {
       const parsed = parseExaContact(r, 'Executive');
       return { ...parsed, rawTitle: r.title };
     });
@@ -517,7 +568,8 @@ async function handleCorrelateRequest(body) {
     // founderContact post
     let tempFounderParsed = null;
     if (exaFounders && exaFounders.length > 0) {
-      tempFounderParsed = parseExaContact(exaFounders[0], 'CEO / Founder');
+      const bestFounder = exaFounders.find(r => isCurrentEmployee(r, companyName)) || exaFounders[0];
+      tempFounderParsed = parseExaContact(bestFounder, 'CEO / Founder');
       postPromises.push(getScrapeCreatorsPosts(tempFounderParsed.url));
       postKeys.push({ type: 'founder' });
     }
@@ -525,7 +577,8 @@ async function handleCorrelateRequest(body) {
     // marketingContact post
     let tempMarketingParsed = null;
     if (exaMarketing && exaMarketing.length > 0) {
-      tempMarketingParsed = parseExaContact(exaMarketing[0], 'Head of Marketing');
+      const bestMarketing = exaMarketing.find(r => isCurrentEmployee(r, companyName)) || exaMarketing[0];
+      tempMarketingParsed = parseExaContact(bestMarketing, 'Head of Marketing');
       postPromises.push(getScrapeCreatorsPosts(tempMarketingParsed.url));
       postKeys.push({ type: 'marketing' });
     }
@@ -535,6 +588,23 @@ async function handleCorrelateRequest(body) {
     postKeys.push({ type: 'company' });
 
     const postResults = await Promise.all(postPromises);
+
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    // Apply translations in parallel for foreign language posts
+    const allPostsToTranslate = [];
+    postKeys.forEach((key, idx) => {
+      const posts = postResults[idx] || [];
+      posts.forEach(p => {
+        allPostsToTranslate.push(p);
+      });
+    });
+
+    await Promise.all(allPostsToTranslate.map(async p => {
+      if (p.text) {
+        p.text = await translateIfNeeded(p.text, apiKey);
+      }
+    }));
 
     postKeys.forEach((key, idx) => {
       const posts = postResults[idx] || [];
@@ -554,8 +624,7 @@ async function handleCorrelateRequest(body) {
     enrichedData.founderContact = founderContact;
     enrichedData.marketingContact = marketingContact;
     enrichedData.companyPosts = companyPosts;
-
-    const apiKey = process.env.GEMINI_API_KEY;
+    
     if (!apiKey) {
       // Fallback synthesis
       const fallback = synthesizeCompanyAccount(companyName, enrichedData, targetDept);

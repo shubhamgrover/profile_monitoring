@@ -556,21 +556,26 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
                         {/* Column 2: Tracked Executives (Rendered inline for quick visibility) */}
                         <td style={{ padding: '12px 16px', fontSize: 12, color: '#4A5568' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {row.executives.map((exec, idx) => (
-                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                <a 
-                                  href={exec.linkedinUrl || 'https://www.linkedin.com'} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  style={{ color: '#132D7D', fontWeight: 700, textDecoration: 'none' }}
-                                  onMouseEnter={e => e.target.style.textDecoration = 'underline'}
-                                  onMouseLeave={e => e.target.style.textDecoration = 'none'}
-                                >
-                                  👤 {exec.name} ↗
-                                </a>
-                                <span style={{ color: '#666666', fontSize: 11 }}>({exec.title || 'Executive'})</span>
-                              </div>
-                            ))}
+                            {row.executives.map((exec, idx) => {
+                              const isCompany = exec.linkedinUrl?.toLowerCase().includes('/company/') || exec.title === 'Company Monitoring';
+                              return (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                  <a 
+                                    href={exec.linkedinUrl || 'https://www.linkedin.com'} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    style={{ color: '#132D7D', fontWeight: 700, textDecoration: 'none' }}
+                                    onMouseEnter={e => e.target.style.textDecoration = 'underline'}
+                                    onMouseLeave={e => e.target.style.textDecoration = 'none'}
+                                  >
+                                    {isCompany ? '🏢 Company Page ↗' : `👤 ${exec.name} ↗`}
+                                  </a>
+                                  {!isCompany && (
+                                    <span style={{ color: '#666666', fontSize: 11 }}>({exec.title || 'Executive'})</span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </td>
 

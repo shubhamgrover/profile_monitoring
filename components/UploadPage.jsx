@@ -262,7 +262,7 @@ export default function UploadPage({ onUploaded, onNavigate, credits }) {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                       <div>
                         <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
-                          ⚡ Exa Company Resolver
+                          ⚡ Target URL Auto-Resolver
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                           Automatically search and link LinkedIn company URLs for the {toResolveCount} unresolved rows.
@@ -271,7 +271,7 @@ export default function UploadPage({ onUploaded, onNavigate, credits }) {
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 16 }}>
-                      <label className="form-label" htmlFor="exa-api-key">Exa API Key</label>
+                      <label className="form-label" htmlFor="exa-api-key">Resolution API Key</label>
                       <input
                         id="exa-api-key"
                         className="form-input"
@@ -289,7 +289,7 @@ export default function UploadPage({ onUploaded, onNavigate, credits }) {
                       onClick={handleResolveUrls}
                       disabled={resolving || !exaKey}
                     >
-                      {resolving ? '⏳ Resolving via Exa API...' : `⚡ Resolve ${toResolveCount} URLs`}
+                      {resolving ? '⏳ Resolving target URLs...' : `⚡ Resolve ${toResolveCount} URLs`}
                     </button>
                   </div>
                 )}
