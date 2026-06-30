@@ -394,7 +394,11 @@ async function handleCorrelateRequest(body) {
 
     let jobOpenings = enrichedData.jobOpenings || [];
     if (jobOpenings.length === 0) {
-      promises.push(searchExa(`"${companyName}" job openings OR careers page OR "hiring"`, 5, null, dateLimit));
+      const domainFilter = domain ? [domain] : null;
+      const jobQuery = domain 
+        ? `site:${domain} (careers OR hiring OR jobs OR "job openings")` 
+        : `"${companyName}" job openings OR careers page OR "hiring"`;
+      promises.push(searchExa(jobQuery, 5, domainFilter, dateLimit));
       keys.push('jobs');
     }
 
@@ -792,7 +796,14 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { companyName, targetDept = 'Marketing', targetSeniority = 'VP' } = body;
+  // Programmatically strip developer/third-party API names from inputs so AI never sees them
+  let sanitizedBodyText = JSON.stringify(body)
+    .replace(/Autobound/gi, 'Intent Engine')
+    .replace(/Exa/gi, 'Search Intelligence')
+    .replace(/ScrapeCreators/gi, 'Social Scraper');
+  const cleanBody = JSON.parse(sanitizedBodyText);
+
+  const { companyName, targetDept = 'Marketing', targetSeniority = 'VP' } = cleanBody;
   if (!companyName) {
     return NextResponse.json({ error: 'Missing companyName' }, { status: 400 });
   }
@@ -802,10 +813,14 @@ export async function POST(request) {
   if (inFlight.has(requestKey)) {
     console.log(`[Correlate API] Deduping concurrent in-flight request for: ${requestKey}`);
     const result = await inFlight.get(requestKey);
-    return NextResponse.json(result);
+    let sanitizedResultText = JSON.stringify(result)
+      .replace(/Autobound/gi, 'Intent Engine')
+      .replace(/Exa/gi, 'Search Intelligence')
+      .replace(/ScrapeCreators/gi, 'Social Scraper');
+    return NextResponse.json(JSON.parse(sanitizedResultText));
   }
 
-  const promise = handleCorrelateRequest(body);
+  const promise = handleCorrelateRequest(cleanBody);
   inFlight.set(requestKey, promise);
 
   try {
@@ -813,7 +828,12 @@ export async function POST(request) {
     if (result.error && result.error.includes('Missing companyName')) {
       return NextResponse.json({ error: 'Missing companyName' }, { status: 400 });
     }
-    return NextResponse.json(result);
+    // Programmatically strip developer/third-party API names from output responses so user never sees them
+    let sanitizedResultText = JSON.stringify(result)
+      .replace(/Autobound/gi, 'Intent Engine')
+      .replace(/Exa/gi, 'Search Intelligence')
+      .replace(/ScrapeCreators/gi, 'Social Scraper');
+    return NextResponse.json(JSON.parse(sanitizedResultText));
   } catch (error) {
     console.error(`[Correlate API] Fatal error for promise ${requestKey}:`, error);
     return NextResponse.json({ error: error.message }, { status: 500 });
