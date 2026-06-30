@@ -929,6 +929,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   const [copiedScriptIndex, setCopiedScriptIndex] = useState(-1);
   const [fetchingProfiles, setFetchingProfiles] = useState(false);
   const [profileActivity, setProfileActivity] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [editingIndex, setEditingIndex] = useState(-1);
   const [editTitle, setEditTitle] = useState('');
   const [editNarrative, setEditNarrative] = useState('');
@@ -1082,7 +1083,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   const contactUrl = synthesis?.recommendedContact?.url || alternateContact?.url || primaryContact?.profileLinkedinUrl || primaryContact?.linkedinUrl || 'https://www.linkedin.com';
   useEffect(() => {
     // If we have a fully resolved, non-fallback cached result in client state or pre-fetched in database snapshot, use it immediately
-    const cached = correlateCache[cacheKey] || snapData.synthesis;
+    const cached = correlateCache[cacheKey] || (refreshTrigger === 0 ? snapData.synthesis : null);
     if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0) {
       setSynthesis(cached);
       if (cached.recommendedFrameworkId) setSelectedFrameworkId(cached.recommendedFrameworkId);
@@ -1213,7 +1214,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
       finally { if (active) setLoadingAI(false); }
     })();
     return () => { active = false; };
-  }, [cacheKey]);
+  }, [cacheKey, targetDept, targetSeniority, refreshTrigger]);
 
   const logoUrl = getLogoUrl(group.domain);
   const pCfg   = PRIORITY_CONFIG[group.priority] || PRIORITY_CONFIG.watch;
@@ -1292,6 +1293,35 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
           </div>
         </div>
         <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', background: pCfg.bg, color: pCfg.color, border: `1px solid ${pCfg.border}`, borderRadius: 0 }}>{pCfg.label}</span>
+        <button
+          onClick={() => {
+            if (setCorrelateCache) {
+              setCorrelateCache(prev => {
+                const copy = { ...prev };
+                delete copy[cacheKey];
+                return copy;
+              });
+            }
+            setSynthesis(null);
+            setRefreshTrigger(prev => prev + 1);
+          }}
+          disabled={loadingAI}
+          style={{
+            padding: '4px 8px',
+            fontSize: 10,
+            fontWeight: 700,
+            background: 'rgba(59, 130, 246, 0.08)',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            color: 'var(--accent-blue)',
+            cursor: 'pointer',
+            borderRadius: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4
+          }}
+        >
+          {loadingAI ? '⏳ Re-analyzing...' : '🔄 Re-run AI Analysis'}
+        </button>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 19, padding: '0 4px', lineHeight: 1 }}>{'\u00D7'}</button>
       </div>
 
