@@ -1054,18 +1054,18 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
     }
   }, [profiles, group.company]);
 
-  const snapPosts  = (snapData.posts && snapData.posts.length > 0)
-    ? snapData.posts 
-    : ((synthesis?.companyPosts && synthesis.companyPosts.length > 0) ? synthesis.companyPosts : (snapData.recentPosts || []));
-  const snapJobs   = (snapData.jobOpenings && snapData.jobOpenings.length > 0)
-    ? snapData.jobOpenings 
-    : (synthesis?.jobOpenings || []);
-  const snapPR     = (snapData.prMentions && snapData.prMentions.length > 0)
-    ? snapData.prMentions 
-    : (synthesis?.prMentions || []);
-  const snapReddit = (snapData.redditMentions && snapData.redditMentions.length > 0)
-    ? snapData.redditMentions 
-    : (synthesis?.redditMentions || []);
+  const snapPosts  = (synthesis?.companyPosts && synthesis.companyPosts.length > 0)
+    ? synthesis.companyPosts 
+    : (snapData.posts && snapData.posts.length > 0 ? snapData.posts : (snapData.recentPosts || []));
+  const snapJobs   = (synthesis?.jobOpenings && synthesis.jobOpenings.length > 0)
+    ? synthesis.jobOpenings 
+    : (snapData.jobOpenings || []);
+  const snapPR     = (synthesis?.prMentions && synthesis.prMentions.length > 0)
+    ? synthesis.prMentions 
+    : (snapData.prMentions || []);
+  const snapReddit = (synthesis?.redditMentions && synthesis.redditMentions.length > 0)
+    ? synthesis.redditMentions 
+    : (snapData.redditMentions || []);
 
   const dynamicContact = dynamicContacts[`${group.company}-${targetDept}-${targetSeniority}`];
   const primaryContact   = group.signals[0];
