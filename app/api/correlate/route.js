@@ -797,10 +797,11 @@ export async function POST(request) {
   }
 
   // Programmatically strip developer/third-party API names from inputs so AI never sees them
+  // Programmatically strip developer/third-party API names from inputs so AI never sees them
   let sanitizedBodyText = JSON.stringify(body)
-    .replace(/Autobound/gi, 'Intent Engine')
-    .replace(/Exa/gi, 'Search Intelligence')
-    .replace(/ScrapeCreators/gi, 'Social Scraper');
+    .replace(/\bAutobound\b/gi, 'Intent Engine')
+    .replace(/\bExa\b/gi, 'Search Intelligence')
+    .replace(/\bScrapeCreators\b/gi, 'Social Scraper');
   const cleanBody = JSON.parse(sanitizedBodyText);
 
   const { companyName, targetDept = 'Marketing', targetSeniority = 'VP' } = cleanBody;
@@ -814,9 +815,9 @@ export async function POST(request) {
     console.log(`[Correlate API] Deduping concurrent in-flight request for: ${requestKey}`);
     const result = await inFlight.get(requestKey);
     let sanitizedResultText = JSON.stringify(result)
-      .replace(/Autobound/gi, 'Intent Engine')
-      .replace(/Exa/gi, 'Search Intelligence')
-      .replace(/ScrapeCreators/gi, 'Social Scraper');
+      .replace(/\bAutobound\b/gi, 'Intent Engine')
+      .replace(/\bExa\b/gi, 'Search Intelligence')
+      .replace(/\bScrapeCreators\b/gi, 'Social Scraper');
     return NextResponse.json(JSON.parse(sanitizedResultText));
   }
 
@@ -830,9 +831,9 @@ export async function POST(request) {
     }
     // Programmatically strip developer/third-party API names from output responses so user never sees them
     let sanitizedResultText = JSON.stringify(result)
-      .replace(/Autobound/gi, 'Intent Engine')
-      .replace(/Exa/gi, 'Search Intelligence')
-      .replace(/ScrapeCreators/gi, 'Social Scraper');
+      .replace(/\bAutobound\b/gi, 'Intent Engine')
+      .replace(/\bExa\b/gi, 'Search Intelligence')
+      .replace(/\bScrapeCreators\b/gi, 'Social Scraper');
     return NextResponse.json(JSON.parse(sanitizedResultText));
   } catch (error) {
     console.error(`[Correlate API] Fatal error for promise ${requestKey}:`, error);
