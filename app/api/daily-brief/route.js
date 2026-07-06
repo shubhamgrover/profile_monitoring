@@ -64,7 +64,7 @@ const parseLinkedInTitle = (titleRaw, companyName = '') => {
 
 export async function POST(request) {
   try {
-    const { signals = [], profiles = [], department = 'Marketing', seniority = 'VP', productDesc = 'SignalEngine B2B tracking tool', valueProposition = 'gives enterprise teams an additional outbound channel and removes dependence on traditional ad spend' } = await request.json();
+    const { signals = [], profiles = [], department = 'Marketing', seniority = 'VP', productDesc = 'HT Media marketing and audience solutions combining trusted media brands (Hindustan Times, Mint, Hindustan), first-party audience data (HT One Audience), content storytelling, and marquee high-credibility events (HT Leadership Summit) to sell trusted audience access, category influence, and business-relevant engagement', valueProposition = 'We help brands reach, influence, and engage the right Indian audiences with credibility, scale, and measurable marketing impact, moving them from buying media space to buying trusted audience access, thought leadership, and business-relevant engagement.' } = await request.json();
 
     if (!signals.length) {
       return NextResponse.json({ targets: [], message: 'No signals found. Run a poll first.' });

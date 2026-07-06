@@ -218,14 +218,14 @@ async function handleCorrelateRequest(body) {
     targetDept = body.targetDept || 'Marketing';
     targetSeniority = body.targetSeniority || 'VP';
     const gtmSettings = body.gtmSettings || {};
-    const productName = (gtmSettings.productName && gtmSettings.productName.trim() !== '') ? gtmSettings.productName : 'our platform';
-    const competitors = (gtmSettings.competitors && gtmSettings.competitors.trim() !== '') ? gtmSettings.competitors : 'traditional ad networks';
+    const productName = (gtmSettings.productName && gtmSettings.productName.trim() !== '') ? gtmSettings.productName : 'HT Media Solutions';
+    const competitors = (gtmSettings.competitors && gtmSettings.competitors.trim() !== '') ? gtmSettings.competitors : 'traditional digital ad networks / simple advertising space';
     const productDesc = (gtmSettings.productDesc && gtmSettings.productDesc.trim() !== '')
       ? (gtmSettings.productName ? `${gtmSettings.productName} (${gtmSettings.productDesc})` : gtmSettings.productDesc)
-      : (body.productDesc || 'B2B intent signal tracking tool');
+      : (body.productDesc || 'HT Media marketing and audience solutions combining trusted media brands (Hindustan Times, Mint, Hindustan), large-scale audience reach, first-party audience data (HT One Audience), content storytelling, and marquee high-credibility events (HT Leadership Summit) to sell trusted audience access, category influence, and business-relevant engagement');
     const valueProposition = (gtmSettings.productDesc && gtmSettings.productDesc.trim() !== '')
       ? `Outperforming competitors like ${competitors} by addressing the specific pain: ${gtmSettings.productDesc}`
-      : (body.valueProposition || 'gives enterprise teams an additional outbound channel and removes dependence on traditional ad spend');
+      : (body.valueProposition || 'We help brands reach, influence, and engage the right Indian audiences with credibility, scale, and measurable marketing impact, moving them from buying media space to buying trusted audience access, thought leadership, and business-relevant engagement.');
     enrichedData = { ...(body.snapData || {}) };
     
     if (!companyName) {
