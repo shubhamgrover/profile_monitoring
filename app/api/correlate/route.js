@@ -373,14 +373,24 @@ async function handleCorrelateRequest(body) {
     const promises = [];
     const keys = [];
 
-    promises.push(searchExa(contactsQuery, 4, ['linkedin.com']));
-    keys.push('contacts');
+    const hasCachedContacts = enrichedData.resolvedContacts && enrichedData.resolvedContacts.length > 0;
+    const hasCachedFounder = enrichedData.founderContact && enrichedData.founderContact.url && enrichedData.founderContact.name;
+    const hasCachedMarketing = enrichedData.marketingContact && enrichedData.marketingContact.url && enrichedData.marketingContact.name;
 
-    promises.push(searchExa(founderQuery, 3, ['linkedin.com']));
-    keys.push('founder');
+    if (!hasCachedContacts) {
+      promises.push(searchExa(contactsQuery, 4, ['linkedin.com']));
+      keys.push('contacts');
+    }
 
-    promises.push(searchExa(marketingQuery, 3, ['linkedin.com']));
-    keys.push('marketing');
+    if (!hasCachedFounder) {
+      promises.push(searchExa(founderQuery, 3, ['linkedin.com']));
+      keys.push('founder');
+    }
+
+    if (!hasCachedMarketing) {
+      promises.push(searchExa(marketingQuery, 3, ['linkedin.com']));
+      keys.push('marketing');
+    }
 
     let companyLinkedinUrl = enrichedData.companyLinkedinUrl || enrichedData.linkedinUrl || '';
     if (!companyLinkedinUrl || companyLinkedinUrl.includes('/in/')) {
@@ -554,16 +564,20 @@ async function handleCorrelateRequest(body) {
       });
     };
 
-    let currentContacts = exaContacts.filter(r => isCurrentEmployee(r, companyName));
-    if (currentContacts.length === 0) currentContacts = exaContacts; // fallback to unfiltered if empty
-    
-    resolvedContacts = currentContacts.map(r => {
-      const parsed = parseExaContact(r, 'Executive');
-      return { ...parsed, rawTitle: r.title };
-    });
+    if (hasCachedContacts) {
+      resolvedContacts = enrichedData.resolvedContacts;
+    } else {
+      let currentContacts = exaContacts.filter(r => isCurrentEmployee(r, companyName));
+      if (currentContacts.length === 0) currentContacts = exaContacts; // fallback to unfiltered if empty
+      
+      resolvedContacts = currentContacts.map(r => {
+        const parsed = parseExaContact(r, 'Executive');
+        return { ...parsed, rawTitle: r.title };
+      });
 
-    if (targetDept === 'Marketing') {
-      resolvedContacts = filterExclusions(resolvedContacts);
+      if (targetDept === 'Marketing') {
+        resolvedContacts = filterExclusions(resolvedContacts);
+      }
     }
 
     // 2. Concurrently fetch all ScrapeCreators social posts in parallel
@@ -571,14 +585,19 @@ async function handleCorrelateRequest(body) {
     const postKeys = [];
 
     // resolvedContacts posts (only fetch for the first/primary contact to prevent Vercel 10s timeout)
-    resolvedContacts.slice(0, 1).forEach((c, idx) => {
-      postPromises.push(getScrapeCreatorsPosts(c.url));
-      postKeys.push({ type: 'contact', index: idx });
-    });
+    if (resolvedContacts.length > 0) {
+      const primaryContact = resolvedContacts[0];
+      postPromises.push(getScrapeCreatorsPosts(primaryContact.url));
+      postKeys.push({ type: 'contact', index: 0 });
+    }
 
     // founderContact post
     let tempFounderParsed = null;
-    if (exaFounders && exaFounders.length > 0) {
+    if (hasCachedFounder) {
+      tempFounderParsed = enrichedData.founderContact;
+      postPromises.push(getScrapeCreatorsPosts(tempFounderParsed.url));
+      postKeys.push({ type: 'founder' });
+    } else if (exaFounders && exaFounders.length > 0) {
       const bestFounder = exaFounders.find(r => isCurrentEmployee(r, companyName)) || exaFounders[0];
       tempFounderParsed = parseExaContact(bestFounder, 'CEO / Founder');
       postPromises.push(getScrapeCreatorsPosts(tempFounderParsed.url));
@@ -587,7 +606,11 @@ async function handleCorrelateRequest(body) {
 
     // marketingContact post
     let tempMarketingParsed = null;
-    if (exaMarketing && exaMarketing.length > 0) {
+    if (hasCachedMarketing) {
+      tempMarketingParsed = enrichedData.marketingContact;
+      postPromises.push(getScrapeCreatorsPosts(tempMarketingParsed.url));
+      postKeys.push({ type: 'marketing' });
+    } else if (exaMarketing && exaMarketing.length > 0) {
       const bestMarketing = exaMarketing.find(r => isCurrentEmployee(r, companyName)) || exaMarketing[0];
       tempMarketingParsed = parseExaContact(bestMarketing, 'Head of Marketing');
       postPromises.push(getScrapeCreatorsPosts(tempMarketingParsed.url));
