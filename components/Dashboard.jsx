@@ -1362,101 +1362,152 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
         <a href={contactUrl} target="_blank" rel="noopener noreferrer" style={{ padding: '5px 12px', fontSize: 12, fontWeight: 600, borderRadius: 0, background: 'rgba(19, 45, 125, 0.08)', border: '1px solid rgba(19, 45, 125, 0.2)', color: '#132D7D', textDecoration: 'none' }}>
           {'\u{1F4BC}'} LinkedIn
         </a>
-      </div>
 
-      {/* Key Contacts (Founder & Marketing Lead) */}
-      <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-elevated)', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{'\u{1F465}'} Key Contacts</div>
-          <button
-            onClick={async () => {
-              const contacts = [];
-              if (synthesis?.founderContact?.url) {
-                contacts.push({ url: synthesis.founderContact.url, name: synthesis.founderContact.name, role: synthesis.founderContact.title || 'Founder / CEO' });
-              }
-              if (synthesis?.marketingContact?.url) {
-                contacts.push({ url: synthesis.marketingContact.url, name: synthesis.marketingContact.name, role: synthesis.marketingContact.title || `${targetDept} Lead` });
-              }
-              if (contacts.length === 0 && synthesis?.resolvedContacts) {
-                synthesis.resolvedContacts.slice(0, 2).forEach(c => {
-                  if (c.url) contacts.push({ url: c.url, name: c.name, role: c.title || 'Executive' });
-                });
-              }
-              if (contacts.length === 0) return;
-              setFetchingProfiles(true);
-              try {
-                const results = await Promise.all(
-                  contacts.map(c =>
-                    fetch('/api/collectors/buying-committee', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ 
-                        profileUrl: c.url, 
-                        companyName: group.company,
-                        userId: userId || profiles?.[0]?.user_id 
-                      })
-                    }).then(r => r.ok ? r.json() : null)
-                  )
-                );
-                const activity = contacts.map((c, i) => ({
-                  name: c.name,
-                  title: results[i]?.title || c.role,
-                  url: c.url,
-                  posts: results[i]?.posts || []
-                }));
-                setProfileActivity(activity);
-              } catch(e) { console.error('Profile activity fetch failed:', e); }
-              finally { setFetchingProfiles(false); }
-            }}
-            style={{
-              fontSize: 10, padding: '3px 8px', fontWeight: 700,
-              background: fetchingProfiles ? 'var(--signal-green-bg)' : 'rgba(19, 45, 125, 0.06)',
-              border: '1px solid rgba(19, 45, 125, 0.2)',
-              color: fetchingProfiles ? 'var(--signal-green)' : '#132D7D',
-              cursor: 'pointer', borderRadius: 0
-            }}
-          >
-            {fetchingProfiles ? '\u23F3 Fetching...' : '\u{1F504} Refresh CRO/CMO Activity'}
-          </button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {/* Founder/CEO */}
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{'\u{1F451}'} Founder / CEO</span>
-            {loadingAI ? (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Resolving contact...</span>
-            ) : synthesis?.founderContact ? (
-              <>
-                <a href={synthesis.founderContact.url || 'https://www.linkedin.com'} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#132D7D', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  {synthesis.founderContact.name} <span style={{ fontSize: 9 }}>{'>>'}</span>
-                </a>
-                {synthesis.founderContact.title && (
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{synthesis.founderContact.title}</span>
+      {/* Resolve extra contact (check if any resolved contact is mentioned in signals) */}
+      {(() => {
+        const allSignalsText = [
+          ...(synthesis?.autoboundSignals || []),
+          ...(snapData.twitterMentions || []),
+          ...(snapData.redditMentions || []),
+          ...(snapData.prMentions || [])
+        ].map(s => {
+          if (typeof s === 'string') return s;
+          return `${s.title || ''} ${s.narrative || ''} ${s.text || ''} ${s.signal_name || ''}`;
+        }).join(' ');
+
+        const resolvedList = synthesis?.resolvedContacts || [];
+        const founderName = (synthesis?.founderContact?.name || '').toLowerCase();
+        const marketingName = (synthesis?.marketingContact?.name || '').toLowerCase();
+
+        let extraContact = resolvedList.find(c => {
+          if (!c.name) return false;
+          const nameLower = c.name.toLowerCase();
+          if (nameLower === founderName || nameLower === marketingName) return false;
+          return allSignalsText.toLowerCase().includes(nameLower);
+        });
+        let isSignalMentioned = !!extraContact;
+
+        if (!extraContact) {
+          extraContact = resolvedList.find(c => {
+            if (!c.name) return false;
+            const nameLower = c.name.toLowerCase();
+            return nameLower !== founderName && nameLower !== marketingName;
+          });
+        }
+
+        return (
+          <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-elevated)', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{'\u{1F465}'} Key Contacts</div>
+              <button
+                onClick={async () => {
+                  const contacts = [];
+                  if (synthesis?.founderContact?.url) {
+                    contacts.push({ url: synthesis.founderContact.url, name: synthesis.founderContact.name, role: synthesis.founderContact.title || 'Founder / CEO' });
+                  }
+                  if (synthesis?.marketingContact?.url) {
+                    contacts.push({ url: synthesis.marketingContact.url, name: synthesis.marketingContact.name, role: synthesis.marketingContact.title || `${targetDept} Lead` });
+                  }
+                  if (extraContact?.url) {
+                    contacts.push({ url: extraContact.url, name: extraContact.name, role: extraContact.title || 'Executive' });
+                  }
+                  if (contacts.length === 0 && synthesis?.resolvedContacts) {
+                    synthesis.resolvedContacts.slice(0, 3).forEach(c => {
+                      if (c.url) contacts.push({ url: c.url, name: c.name, role: c.title || 'Executive' });
+                    });
+                  }
+                  if (contacts.length === 0) return;
+                  setFetchingProfiles(true);
+                  try {
+                    const results = await Promise.all(
+                      contacts.map(c =>
+                        fetch('/api/collectors/buying-committee', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ 
+                            profileUrl: c.url, 
+                            companyName: group.company,
+                            userId: userId || profiles?.[0]?.user_id 
+                          })
+                        }).then(r => r.ok ? r.json() : null)
+                      )
+                    );
+                    const activity = contacts.map((c, i) => ({
+                      name: c.name,
+                      title: results[i]?.title || c.role,
+                      url: c.url,
+                      posts: results[i]?.posts || []
+                    }));
+                    setProfileActivity(activity);
+                  } catch(e) { console.error('Profile activity fetch failed:', e); }
+                  finally { setFetchingProfiles(false); }
+                }}
+                style={{
+                  fontSize: 10, padding: '3px 8px', fontWeight: 700,
+                  background: fetchingProfiles ? 'var(--signal-green-bg)' : 'rgba(19, 45, 125, 0.06)',
+                  border: '1px solid rgba(19, 45, 125, 0.2)',
+                  color: fetchingProfiles ? 'var(--signal-green)' : '#132D7D',
+                  cursor: 'pointer', borderRadius: 0
+                }}
+              >
+                {fetchingProfiles ? '\u23F3 Fetching...' : '\u{1F504} Refresh CRO/CMO Activity'}
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              {/* Founder/CEO */}
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{'\u{1F451}'} Founder / CEO</span>
+                {loadingAI ? (
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Resolving contact...</span>
+                ) : synthesis?.founderContact ? (
+                  <>
+                    <a href={synthesis.founderContact.url || 'https://www.linkedin.com'} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#132D7D', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {synthesis.founderContact.name} <span style={{ fontSize: 9 }}>{'>>'}</span>
+                    </a>
+                    {synthesis.founderContact.title && (
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{synthesis.founderContact.title}</span>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Not found</span>
                 )}
-              </>
-            ) : (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Not found</span>
-            )}
-          </div>
-          {/* Marketing / Sales Lead */}
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{'\u{1F4E2}'} {targetDept} Lead</span>
-            {loadingAI ? (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Resolving contact...</span>
-            ) : synthesis?.marketingContact ? (
-              <>
-                <a href={synthesis.marketingContact.url || 'https://www.linkedin.com'} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#132D7D', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  {synthesis.marketingContact.name} <span style={{ fontSize: 9 }}>{'>>'}</span>
-                </a>
-                {synthesis.marketingContact.title && (
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{synthesis.marketingContact.title}</span>
+              </div>
+              {/* Marketing / Sales Lead */}
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{'\u{1F4E2}'} {targetDept} Lead</span>
+                {loadingAI ? (
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Resolving contact...</span>
+                ) : synthesis?.marketingContact ? (
+                  <>
+                    <a href={synthesis.marketingContact.url || 'https://www.linkedin.com'} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#132D7D', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {synthesis.marketingContact.name} <span style={{ fontSize: 9 }}>{'>>'}</span>
+                    </a>
+                    {synthesis.marketingContact.title && (
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{synthesis.marketingContact.title}</span>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Not found</span>
                 )}
-              </>
-            ) : (
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Not found</span>
-            )}
+              </div>
+              {/* Extra Active/Resolved Contact */}
+              {extraContact && (
+                <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 10, color: isSignalMentioned ? 'var(--signal-green)' : 'var(--text-muted)', fontWeight: 600 }}>
+                    {isSignalMentioned ? '\u26A1 Active Signal Contact' : '\u{1F465} Key Contact'}
+                  </span>
+                  <a href={extraContact.url || 'https://www.linkedin.com'} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#132D7D', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {extraContact.name} <span style={{ fontSize: 9 }}>{'>>'}</span>
+                  </a>
+                  {extraContact.title && (
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{extraContact.title}</span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        );
+      })()}
 
         {/* Profile Activity (CRO/CMO recent posts — fetched on demand) */}
         {profileActivity && profileActivity.length > 0 && (
