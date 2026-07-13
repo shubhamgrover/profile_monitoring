@@ -936,8 +936,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   };
 
   const [synthesis, setSynthesis]         = useState(() => {
-    const initCached = correlateCache[cacheKey] || snapData.synthesis || group.synthesis;
-    return (initCached && !isFallbackSynthesis(initCached)) ? initCached : null;
+    return correlateCache[cacheKey] || snapData.synthesis || group.synthesis || null;
   });
   const [loadingAI, setLoadingAI]         = useState(false);
   const [autoboundSignals, setAutoboundSignals] = useState(snapData.autoboundSignals || []);
@@ -1100,9 +1099,8 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   
   const contactUrl = synthesis?.recommendedContact?.url || alternateContact?.url || primaryContact?.profileLinkedinUrl || primaryContact?.linkedinUrl || 'https://www.linkedin.com';
   useEffect(() => {
-    // If we have a fully resolved, non-fallback cached result in client state or pre-fetched in database snapshot, use it immediately
     const cached = correlateCache[cacheKey] || (refreshTrigger === 0 ? snapData.synthesis : null);
-    if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0 && !isFallbackSynthesis(cached)) {
+    if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0) {
       setSynthesis(cached);
       if (cached.recommendedFrameworkId) setSelectedFrameworkId(cached.recommendedFrameworkId);
       setAutoboundSignals(cached.autoboundSignals || snapData.autoboundSignals || []);
