@@ -6,7 +6,7 @@ import { MOCK_PROFILES, MOCK_POLL_LOG, MOCK_SIGNALS } from '../lib/mockData';
 import { identifyLinkedInUrlType } from '../lib/poller';
 import { supabase } from '../lib/supabaseClient';
 
-export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, onApiKeyChange, onProfilesUpdated, onSignalsDetected, onNavigate, targetDept = 'Marketing', targetSeniority = 'VP' }) {
+export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, onApiKeyChange, onProfilesUpdated, onSignalsDetected, onNavigate, targetDept = 'Marketing', targetSeniority = 'VP', userId }) {
   const [apiKey, setApiKey] = useState(propApiKey || '');
   const [polling, setPolling] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -182,7 +182,7 @@ export default function PollPage({ profiles: propProfiles, apiKey: propApiKey, o
             let gtmSettings = {};
             if (typeof window !== 'undefined') {
               try {
-                const stored = localStorage.getItem('gtm_product_settings');
+                const stored = localStorage.getItem('gtm_product_settings_' + (userId || ''));
                 if (stored) gtmSettings = JSON.parse(stored);
               } catch (e) {
                 console.error('Failed to load GTM settings in PollPage:', e);

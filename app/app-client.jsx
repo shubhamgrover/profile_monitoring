@@ -505,6 +505,7 @@ export default function App() {
             onProfilesUpdated={refreshData}
             onSignalsDetected={handleSignalsDetected}
             credits={{ remaining: credits.total - credits.used }}
+            userId={session?.user?.id}
           />
         )}
         {page === 'poll' && (
@@ -517,6 +518,7 @@ export default function App() {
             onNavigate={setPage}
             targetDept={targetDept}
             targetSeniority={targetSeniority}
+            userId={session?.user?.id}
           />
         )}
       </main>

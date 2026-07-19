@@ -483,8 +483,12 @@ async function handleCorrelateRequest(body) {
     // Parsing helpers
     const parseLinkedInTitle = (titleRaw) => {
       let cleanTitle = titleRaw.replace(/\s*[|–-]\s*LinkedIn\b/i, '').trim();
+      // Handle 'Post by Name' noise
+      if (cleanTitle.toLowerCase().startsWith('post by ')) {
+        cleanTitle = cleanTitle.substring(8).trim();
+      }
       const segments = cleanTitle.split(/\s*[-|–—]\s*/).map(s => s.trim()).filter(Boolean);
-      const name = segments[0] || 'LinkedIn Member';
+      let name = segments[0] || 'LinkedIn Member';
       let title = segments[1] || 'Executive';
       if (title.includes(' at ')) title = title.split(' at ')[0].trim();
       else if (title.includes(' @ ')) title = title.split(' @ ')[0].trim();
@@ -564,11 +568,30 @@ async function handleCorrelateRequest(body) {
       });
     };
 
+    const cleanExaResults = (results) => {
+      if (!results) return [];
+      const filtered = results.filter(r => {
+        if (!r.url) return false;
+        const urlLower = r.url.toLowerCase();
+        if (urlLower.includes('/posts/') || 
+            urlLower.includes('/activity/') || 
+            urlLower.includes('/pulse/') || 
+            urlLower.includes('/company/') || 
+            urlLower.includes('/job/') ||
+            urlLower.includes('/dir/')) {
+          return false;
+        }
+        return urlLower.includes('/in/');
+      });
+      return filtered.length > 0 ? filtered : results;
+    };
+
     if (hasCachedContacts) {
       resolvedContacts = enrichedData.resolvedContacts;
     } else {
-      let currentContacts = exaContacts.filter(r => isCurrentEmployee(r, companyName));
-      if (currentContacts.length === 0) currentContacts = exaContacts; // fallback to unfiltered if empty
+      const cleanContacts = cleanExaResults(exaContacts);
+      let currentContacts = cleanContacts.filter(r => isCurrentEmployee(r, companyName));
+      if (currentContacts.length === 0) currentContacts = cleanContacts; // fallback to unfiltered if empty
       
       resolvedContacts = currentContacts.map(r => {
         const parsed = parseExaContact(r, 'Executive');
@@ -598,7 +621,8 @@ async function handleCorrelateRequest(body) {
       postPromises.push(getScrapeCreatorsPosts(tempFounderParsed.url));
       postKeys.push({ type: 'founder' });
     } else if (exaFounders && exaFounders.length > 0) {
-      const bestFounder = exaFounders.find(r => isCurrentEmployee(r, companyName)) || exaFounders[0];
+      const cleanFounders = cleanExaResults(exaFounders);
+      const bestFounder = cleanFounders.find(r => isCurrentEmployee(r, companyName)) || cleanFounders[0];
       tempFounderParsed = parseExaContact(bestFounder, 'CEO / Founder');
       postPromises.push(getScrapeCreatorsPosts(tempFounderParsed.url));
       postKeys.push({ type: 'founder' });
@@ -611,7 +635,8 @@ async function handleCorrelateRequest(body) {
       postPromises.push(getScrapeCreatorsPosts(tempMarketingParsed.url));
       postKeys.push({ type: 'marketing' });
     } else if (exaMarketing && exaMarketing.length > 0) {
-      const bestMarketing = exaMarketing.find(r => isCurrentEmployee(r, companyName)) || exaMarketing[0];
+      const cleanMarketing = cleanExaResults(exaMarketing);
+      const bestMarketing = cleanMarketing.find(r => isCurrentEmployee(r, companyName)) || cleanMarketing[0];
       tempMarketingParsed = parseExaContact(bestMarketing, 'Head of Marketing');
       postPromises.push(getScrapeCreatorsPosts(tempMarketingParsed.url));
       postKeys.push({ type: 'marketing' });

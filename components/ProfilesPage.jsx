@@ -40,7 +40,7 @@ export function cleanDomain(companyName, linkedinUrl) {
   return clean ? `${clean}.com` : 'unknown.com';
 }
 
-export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
+export default function ProfilesPage({ profiles: propProfiles, onNavigate, userId }) {
   const [profiles, setProfiles] = useState(propProfiles || REAL_PROFILES);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
@@ -56,7 +56,7 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('gtm_product_settings');
+        const stored = localStorage.getItem('gtm_product_settings_' + (userId || ''));
         if (stored) {
           const parsed = JSON.parse(stored);
           setProductName(parsed.productName || '');
@@ -67,12 +67,12 @@ export default function ProfilesPage({ profiles: propProfiles, onNavigate }) {
         console.error('Failed to load GTM settings:', e);
       }
     }
-  }, []);
+  }, [userId]);
 
   const handleSaveGTMSettings = (e) => {
     e.preventDefault();
     const settings = { productName, productDesc, competitors };
-    localStorage.setItem('gtm_product_settings', JSON.stringify(settings));
+    localStorage.setItem('gtm_product_settings_' + (userId || ''), JSON.stringify(settings));
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };

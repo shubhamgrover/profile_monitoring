@@ -1118,7 +1118,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
         let gtmSettings = null;
         if (typeof window !== 'undefined') {
           try {
-            const stored = localStorage.getItem('gtm_product_settings');
+            const stored = localStorage.getItem('gtm_product_settings_' + (userId || ''));
             if (stored) {
               gtmSettings = JSON.parse(stored);
             }
