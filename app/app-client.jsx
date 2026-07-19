@@ -45,7 +45,27 @@ export default function App() {
   useEffect(() => {
     if (loadingSession) return;
     const userId = session?.user?.id;
-    const stored = localStorage.getItem('onboarding_settings_' + (userId || ''));
+    const namespacedKey = 'onboarding_settings_' + (userId || '');
+    let stored = localStorage.getItem(namespacedKey);
+    
+    // Auto-migration fallback: if no namespaced settings exist, but old global ones do, migrate them!
+    if (!stored && typeof window !== 'undefined') {
+      try {
+        const oldGlobal = localStorage.getItem('onboarding_settings');
+        if (oldGlobal) {
+          localStorage.setItem(namespacedKey, oldGlobal);
+          stored = oldGlobal;
+          
+          const oldGtm = localStorage.getItem('gtm_product_settings');
+          if (oldGtm) {
+            localStorage.setItem('gtm_product_settings_' + (userId || ''), oldGtm);
+          }
+        }
+      } catch (e) {
+        console.error('Migration error:', e);
+      }
+    }
+
     if (stored) {
       const parsed = JSON.parse(stored);
       setOnboardingSettings(parsed);
