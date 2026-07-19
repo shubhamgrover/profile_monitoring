@@ -367,7 +367,19 @@ async function handleCorrelateRequest(body) {
     const domainContext = domain ? ` (${domain})` : '';
     const contactsQuery = `LinkedIn profile of a ${targetSeniority} in the ${targetDept} department at ${companyName}${domainContext} site:linkedin.com/in/`;
     const founderQuery = `LinkedIn profile of the CEO, Founder, or President of ${companyName}${domainContext} site:linkedin.com/in/`;
-    const marketingQuery = `LinkedIn profile of the CMO, VP of Marketing, or Head of Marketing at ${companyName}${domainContext} site:linkedin.com/in/`;
+    
+    let marketingQuery = `LinkedIn profile of the CMO, VP of Marketing, or Head of Marketing at ${companyName}${domainContext} site:linkedin.com/in/`;
+    if (targetDept === 'HR') {
+      marketingQuery = `LinkedIn profile of the CHRO, VP of HR, Head of HR, VP of People, or Chief People Officer at ${companyName}${domainContext} site:linkedin.com/in/`;
+    } else if (targetDept === 'Sales') {
+      marketingQuery = `LinkedIn profile of the CRO, VP of Sales, or Head of Sales at ${companyName}${domainContext} site:linkedin.com/in/`;
+    } else if (targetDept === 'Engineering') {
+      marketingQuery = `LinkedIn profile of the CTO, VP of Engineering, or Head of Engineering at ${companyName}${domainContext} site:linkedin.com/in/`;
+    } else if (targetDept === 'Product') {
+      marketingQuery = `LinkedIn profile of the CPO, VP of Product, or Head of Product at ${companyName}${domainContext} site:linkedin.com/in/`;
+    } else if (targetDept === 'Operations') {
+      marketingQuery = `LinkedIn profile of the COO, VP of Operations, or Head of Operations at ${companyName}${domainContext} site:linkedin.com/in/`;
+    }
 
     // 1. Concurrently resolve all Exa searches
     const promises = [];
@@ -686,7 +698,7 @@ async function handleCorrelateRequest(body) {
     
     if (!apiKey) {
       // Fallback synthesis
-      const fallback = synthesizeCompanyAccount(companyName, enrichedData, targetDept);
+      const fallback = synthesizeCompanyAccount(companyName, enrichedData, targetDept, gtmSettings);
       const finalResponse = prepareCorrelateResponse(fallback, resolvedContacts, founderContact, marketingContact, companyPosts, true, companyName, targetDept, jobOpenings, prMentions, redditMentions, twitterMentions, enrichedData.autoboundSignals || []);
       return finalResponse;
     }
@@ -830,7 +842,7 @@ Generate the deep correlations based on these 5 signal streams. Make sure that i
 
   } catch (error) {
     console.error('Error in /api/correlate route:', error.message);
-    const fallback = synthesizeCompanyAccount(companyName || 'Unknown', enrichedData || {}, targetDept);
+    const fallback = synthesizeCompanyAccount(companyName || 'Unknown', enrichedData || {}, targetDept, gtmSettings);
     const finalResponse = prepareCorrelateResponse(fallback, resolvedContacts || [], founderContact || null, marketingContact || null, companyPosts || [], true, companyName || 'Unknown', targetDept, enrichedData.jobOpenings || [], enrichedData.prMentions || [], enrichedData.redditMentions || [], enrichedData.twitterMentions || [], enrichedData.autoboundSignals || []);
     return { ...finalResponse, error: error.message };
   }
