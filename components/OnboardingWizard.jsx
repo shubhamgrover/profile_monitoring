@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-export default function OnboardingWizard({ onSave, onClose }) {
+export default function OnboardingWizard({ onSave, onClose, userId }) {
   const [step, setStep] = useState(1);
   const [productDesc, setProductDesc] = useState('');
   const [valueProposition, setValueProposition] = useState('');
@@ -23,7 +23,7 @@ export default function OnboardingWizard({ onSave, onClose }) {
       targetSeniority
     };
     
-    localStorage.setItem('onboarding_settings', JSON.stringify(settings));
+    localStorage.setItem('onboarding_settings_' + (userId || ''), JSON.stringify(settings));
     
     // Sync with watchlist GTM settings
     const gtmSettings = {
@@ -31,7 +31,7 @@ export default function OnboardingWizard({ onSave, onClose }) {
       productDesc: `${productDesc}\n\nValue Proposition: ${valueProposition}`,
       competitors: ''
     };
-    localStorage.setItem('gtm_product_settings', JSON.stringify(gtmSettings));
+    localStorage.setItem('gtm_product_settings_' + (userId || ''), JSON.stringify(gtmSettings));
 
     onSave(settings);
     onClose();

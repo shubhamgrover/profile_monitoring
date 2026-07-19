@@ -41,9 +41,11 @@ export default function App() {
   // This prevents re-fetching (and burning credits) every time a user re-opens a company dossier.
   const [correlateCache, setCorrelateCache] = useState({});
 
-  // Load Onboarding Settings on mount
+  // Load Onboarding Settings when session loads
   useEffect(() => {
-    const stored = localStorage.getItem('onboarding_settings');
+    if (loadingSession) return;
+    const userId = session?.user?.id;
+    const stored = localStorage.getItem('onboarding_settings_' + (userId || ''));
     if (stored) {
       const parsed = JSON.parse(stored);
       setOnboardingSettings(parsed);
@@ -52,22 +54,24 @@ export default function App() {
     } else {
       setShowOnboarding(true);
     }
-  }, []);
+  }, [session, loadingSession]);
 
   // Persist target settings when changed
   useEffect(() => {
+    if (loadingSession) return;
+    const userId = session?.user?.id;
     try {
-      const stored = localStorage.getItem('onboarding_settings');
+      const stored = localStorage.getItem('onboarding_settings_' + (userId || ''));
       let current = stored ? JSON.parse(stored) : {};
       if (current.targetDept !== targetDept || current.targetSeniority !== targetSeniority) {
         current.targetDept = targetDept;
         current.targetSeniority = targetSeniority;
-        localStorage.setItem('onboarding_settings', JSON.stringify(current));
+        localStorage.setItem('onboarding_settings_' + (userId || ''), JSON.stringify(current));
       }
     } catch (e) {
       console.error('Failed to sync target settings:', e);
     }
-  }, [targetDept, targetSeniority]);
+  }, [targetDept, targetSeniority, session, loadingSession]);
 
   // Listen for Authentication state changes
   useEffect(() => {
@@ -533,6 +537,7 @@ export default function App() {
             showToast("🚀 Workspace initialized successfully!");
           }}
           onClose={() => setShowOnboarding(false)}
+          userId={session?.user?.id}
         />
       )}
 
