@@ -706,34 +706,42 @@ async function handleCorrelateRequest(body) {
     let hrSpecificInstructions = "";
     if (targetDept === 'HR') {
       hrSpecificInstructions = `
-CRITICAL INSTRUCTIONS FOR HR/L&D TARGETING:
-We are selling HR Professional Certification Programs (such as Aon's Talent Academy, Aon Rewards Academy, HRBP Academy, Certified Talent Acquisition Ready, Certified Sales Compensation Expert, Certified Rewards Ready, Certified Job Evaluation Expert, Certified L&D Professional, Strategic HR Leadership Certificate, etc.) to CHROs, Chief Learning Officers, L&D Heads, and people leaders.
-We DO NOT sell general courses for everyone. We sell courses specifically to upskill the HR/L&D/Recruiting team themselves.
+CRITICAL INSTRUCTIONS FOR AON LEARNING CENTER L&D TARGETING:
+We sell three corporate training academies at Aon to CHROs, Chief Learning Officers, L&D Heads, and business leaders:
+1. **Aon's HR Academy** (certified programs specifically to upskill the HR/L&D/Recruiting team themselves to handle organizational growth):
+   - Certified Talent Acquisition Ready (for hiring, sourcing, structured BEI interviews)
+   - Certified Sales Compensation Expert (for quota design, sales incentive plans)
+   - Certified Rewards Ready & Certified Job Evaluation Expert (total rewards, job architectures)
+   - Certified L&D Professional & Certified Talent Management Professional (L&D strategy, pipelines)
+   - Certified HR Business Partner Ready & Certified HR Analytics Ready (HRBP skills, data-backed decisions)
+   - Certified HR Technology and Operations Professional (HR service delivery, standardizing processes)
+2. **Aon's Leadership Academy** (for upskilling first-time managers, emerging leaders, and senior executives to navigate change, build alignment, and avoid operational friction):
+   - Module 1: Leading Self (emotional intelligence, personal productivity)
+   - Module 2: Leading Teams (team management, coaching)
+   - Module 3: Strategic Influence & Stakeholder Management
+   - Module 4: Leading Change & Innovation (change management)
+   - Module 5: Business Acumen & Decision Making
+   - Module 6: Cross-Functional Leadership
+   - Module 7: Building Future-Ready Organizations
+3. **Aon's Sales Academy** (for upskilling SDRs, sales reps, account managers, and sales leaders to boost rep productivity and hit revenue targets):
+   - Module 1: Strategic Planning & Execution (forecasting, goals)
+   - Module 2: Sales Acumen & Techniques
+   - Module 3: Relationship & Account Management
+   - Module 4: Negotiation & Contract Management
+   - Module 5: Market Responsiveness & Data Analysis
 
 For every correlation:
-1. Ground the correlation in the target company's business signals (e.g. Hiring, Sales hiring, Tech shifts, M&As, Funding, PR).
-2. The narrative/reality [A] MUST explain the underlying business pressure and predict the capability gap. Frame it as: "Since [X] tag/signal exists, it means [Y (implication)] and [Z (L&D need)], and generally you need specific HR training to have everyone up to speed."
-3. The outreach script [P] MUST pitch the specific name of an Aon HR Academy course or certification program (e.g. "Certified Sales Compensation Expert" for sales expansion, "Certified Talent Acquisition Ready" for hiring sprees, etc.) to get their team up to speed.
+1. Ground the correlation in the target company's business pressure signals (e.g. general hiring, sales hiring, promotions/first-time managers, tech updates/CRM rollouts, M&As/restructuring).
+2. The narrative/reality [A] MUST explain the business pressure and predict the capability gap. Frame it as: "Since [X] tag/signal exists, it means [Y (implication)] and [Z (L&D need)], and generally you need specific training to have everyone up to speed."
+3. The outreach script [P] MUST pitch the specific name of an Aon Academy course or module (e.g. Aon's Sales Academy Module 2 for sales hiring, Aon's Leadership Academy Module 2 for team scaling/promotions, etc.) to get their team up to speed.
 
 Example structure for narrative/reality [A]:
-"Since we see a large sales hiring spree, it generally means revenue targets are increasing, which creates a critical L&D need to improve new rep productivity and standardize messaging. This means you need a course like Aon's Certified Sales Compensation Expert or Talent Acquisition Ready to have the hiring managers and rewards team up to speed."
+"Since we see a large sales hiring spree, it generally means revenue targets are increasing, which creates a critical L&D need to improve new rep productivity and standardize techniques. This means you need Aon's Sales Academy (Module 2: Sales Acumen & Techniques) to have the sales reps and hiring managers up to speed."
 
 Example structure for outreach script [P]:
-"Which means this can be our pitch: 'I noticed your active sales team scaling. Since sales expansions exist, it generally means new reps need faster productivity. We help HR and rewards leaders leverage Aon's Certified Sales Compensation Expert program to design competitive sales incentive plans and get everyone up to speed. Worth a quick chat?'"
+"Which means this can be our pitch: 'I noticed your active sales team scaling. Since sales expansions exist, it generally means new reps need faster productivity. We help sales and HR leaders leverage Aon's Sales Academy (Module 2: Sales Acumen & Techniques) to upskill reps and get everyone up to speed. Worth a quick chat?'"
 
-Ensure that all generated outreach scripts [P] and email frameworks follow this pattern, mentioning specific course names from:
-- Certified Talent Acquisition Ready
-- Certified Assessments Expert
-- Certified Behavioral Event Interviewing Expert
-- Certified Sales Compensation Expert
-- Certified Rewards Ready
-- Certified Job Evaluation Expert
-- Certified Performance Management Ready
-- Certified L&D Professional
-- Strategic HR Leadership Certificate
-- Certified HR Business Partner Ready
-- Certified HR Analytics Ready
-- Certified HR Technology and Operations Professional
+Ensure that all generated outreach scripts [P] and email frameworks follow this pattern, matching the signals to the correct Aon Academies (HR, Sales, or Leadership).
 `;
     }
 
