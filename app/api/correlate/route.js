@@ -355,7 +355,7 @@ async function handleCorrelateRequest(body) {
     const deptMap = {
       'Marketing': '(Marketing OR Brand OR Growth OR PR OR Communications OR CMO)',
       'Sales': '(Sales OR Outbound OR BD OR "Business Development" OR Account OR Revenue OR CRO)',
-      'HR': '(HR OR Talent OR Recruiting OR People OR Culture OR CHRO)',
+      'HR': '(CHRO OR "Learning & Development" OR L&D OR Learning OR Training OR HR OR Talent)',
       'Engineering': '(Engineering OR Developer OR Technical OR Software OR Architect OR CTO)',
       'Operations': '(Operations OR Ops OR COO)',
       'Product': '(Product OR PM OR CPO)'
@@ -370,7 +370,7 @@ async function handleCorrelateRequest(body) {
     
     let marketingQuery = `LinkedIn profile of the CMO, VP of Marketing, or Head of Marketing at ${companyName}${domainContext} site:linkedin.com/in/`;
     if (targetDept === 'HR') {
-      marketingQuery = `LinkedIn profile of the CHRO, VP of HR, Head of HR, VP of People, or Chief People Officer at ${companyName}${domainContext} site:linkedin.com/in/`;
+      marketingQuery = `LinkedIn profile of the CHRO, Chief Learning Officer, Head of L&D, L&D Head, VP of HR, or Chief People Officer at ${companyName}${domainContext} site:linkedin.com/in/`;
     } else if (targetDept === 'Sales') {
       marketingQuery = `LinkedIn profile of the CRO, VP of Sales, or Head of Sales at ${companyName}${domainContext} site:linkedin.com/in/`;
     } else if (targetDept === 'Engineering') {
@@ -703,7 +703,43 @@ async function handleCorrelateRequest(body) {
       return finalResponse;
     }
 
-        const systemPrompt = `You are the world’s elite B2B Go-To-Market (GTM) strategist, corporate intelligence analyst, and master of Account-Based Marketing (ABM).
+    let hrSpecificInstructions = "";
+    if (targetDept === 'HR') {
+      hrSpecificInstructions = `
+CRITICAL INSTRUCTIONS FOR HR/L&D TARGETING:
+We are selling HR Professional Certification Programs (such as Aon's Talent Academy, Aon Rewards Academy, HRBP Academy, Certified Talent Acquisition Ready, Certified Sales Compensation Expert, Certified Rewards Ready, Certified Job Evaluation Expert, Certified L&D Professional, Strategic HR Leadership Certificate, etc.) to CHROs, Chief Learning Officers, L&D Heads, and people leaders.
+We DO NOT sell general courses for everyone. We sell courses specifically to upskill the HR/L&D/Recruiting team themselves.
+
+For every correlation:
+1. Ground the correlation in the target company's business signals (e.g. Hiring, Sales hiring, Tech shifts, M&As, Funding, PR).
+2. The narrative/reality [A] MUST explain the underlying business pressure and predict the capability gap. Frame it as: "Since [X] tag/signal exists, it means [Y (implication)] and [Z (L&D need)], and generally you need specific HR training to have everyone up to speed."
+3. The outreach script [P] MUST pitch the specific name of an Aon HR Academy course or certification program (e.g. "Certified Sales Compensation Expert" for sales expansion, "Certified Talent Acquisition Ready" for hiring sprees, etc.) to get their team up to speed.
+
+Example structure for narrative/reality [A]:
+"Since we see a large sales hiring spree, it generally means revenue targets are increasing, which creates a critical L&D need to improve new rep productivity and standardize messaging. This means you need a course like Aon's Certified Sales Compensation Expert or Talent Acquisition Ready to have the hiring managers and rewards team up to speed."
+
+Example structure for outreach script [P]:
+"Which means this can be our pitch: 'I noticed your active sales team scaling. Since sales expansions exist, it generally means new reps need faster productivity. We help HR and rewards leaders leverage Aon's Certified Sales Compensation Expert program to design competitive sales incentive plans and get everyone up to speed. Worth a quick chat?'"
+
+Ensure that all generated outreach scripts [P] and email frameworks follow this pattern, mentioning specific course names from:
+- Certified Talent Acquisition Ready
+- Certified Assessments Expert
+- Certified Behavioral Event Interviewing Expert
+- Certified Sales Compensation Expert
+- Certified Rewards Ready
+- Certified Job Evaluation Expert
+- Certified Performance Management Ready
+- Certified L&D Professional
+- Strategic HR Leadership Certificate
+- Certified HR Business Partner Ready
+- Certified HR Analytics Ready
+- Certified HR Technology and Operations Professional
+`;
+    }
+
+    const systemPrompt = `You are the world’s elite B2B Go-To-Market (GTM) strategist, corporate intelligence analyst, and master of Account-Based Marketing (ABM).
+
+${hrSpecificInstructions}
 
 You are being handed a pre-compiled, multi-channel data payload for a target account. Your core capability is Multi-Signal Synthesis: you do not look at data points in isolation. Instead, you look for the "connective tissue" where an executive's personal point of view, a technical social media discussion, an API trigger, and job openings collide to reveal an unannounced corporate pivot, macro strategic shift, or massive operational bottleneck.
 

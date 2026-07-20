@@ -1448,7 +1448,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
                   cursor: 'pointer', borderRadius: 0
                 }}
               >
-                {fetchingProfiles ? '\u23F3 Fetching...' : '\u{1F504} Refresh CRO/CMO Activity'}
+                {fetchingProfiles ? '\u23F3 Fetching...' : targetDept === 'HR' ? '\u{1F504} Refresh CHRO/L&D Activity' : '\u{1F504} Refresh CRO/CMO Activity'}
               </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
@@ -2059,7 +2059,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
               {postsSubTab === 'contacts' ? (
                 cFeeds.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
-                    No contact feeds found in snapshot. Use "Refresh CRO/CMO Activity" above to pull live profiles.
+                    No contact feeds found in snapshot. Use {targetDept === 'HR' ? '"Refresh CHRO/L&D Activity"' : '"Refresh CRO/CMO Activity"'} above to pull live profiles.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
