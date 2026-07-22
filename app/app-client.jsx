@@ -48,15 +48,15 @@ export default function App() {
     const namespacedKey = 'onboarding_settings_' + (userId || '');
     let stored = localStorage.getItem(namespacedKey);
     
-    // Auto-migration fallback: if no namespaced settings exist, but old global ones do, migrate them!
+    // Auto-migration fallback: if no namespaced settings exist, but old global/anon ones do, migrate them!
     if (!stored && typeof window !== 'undefined') {
       try {
-        const oldGlobal = localStorage.getItem('onboarding_settings');
+        const oldGlobal = localStorage.getItem('onboarding_settings') || localStorage.getItem('onboarding_settings_');
         if (oldGlobal) {
           localStorage.setItem(namespacedKey, oldGlobal);
           stored = oldGlobal;
           
-          const oldGtm = localStorage.getItem('gtm_product_settings');
+          const oldGtm = localStorage.getItem('gtm_product_settings') || localStorage.getItem('gtm_product_settings_');
           if (oldGtm) {
             localStorage.setItem('gtm_product_settings_' + (userId || ''), oldGtm);
           }

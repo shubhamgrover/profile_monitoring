@@ -505,6 +505,18 @@ async function handleCorrelateRequest(body) {
       if (title.includes(' at ')) title = title.split(' at ')[0].trim();
       else if (title.includes(' @ ')) title = title.split(' @ ')[0].trim();
       
+      const hasJobKeywords = /\b(hr|talent|people|recruiting|learning|training|compensation|rewards|performance|director|head|manager|lead|chief|officer|vp|president|executive|analyst|partner|recruiter|sourcing|acquisition|talent|learning|development|l&d|clo|chro)\b/i.test(title);
+      
+      if (!hasJobKeywords || title.toLowerCase() === companyName.toLowerCase() || title.toLowerCase().includes(companyName.toLowerCase()) || title.toLowerCase().includes('securities') || title.toLowerCase().includes('bank') || title.toLowerCase().includes('insurance')) {
+        if (segments[2] && /\b(hr|talent|people|recruiting|learning|training|compensation|rewards|performance|director|head|manager|lead|chief|officer|vp|president|executive|analyst|partner|recruiter|sourcing|acquisition|talent|learning|development|l&d|clo|chro)\b/i.test(segments[2])) {
+          title = segments[2];
+          if (title.includes(' at ')) title = title.split(' at ')[0].trim();
+          else if (title.includes(' @ ')) title = title.split(' @ ')[0].trim();
+        } else {
+          title = targetDept === 'HR' ? 'CHRO / L&D Head' : targetDept === 'Marketing' ? 'CMO / Marketing Lead' : 'Executive';
+        }
+      }
+
       // Title Normalization
       title = title
         .replace(/\bChief Executive Officer\b/gi, 'CEO')
