@@ -105,7 +105,9 @@ async function getCompanyPagePosts(companyName, companyLinkedinUrl) {
   const apiKey = process.env.SCRAPECREATORS_API_KEY || 'dummy-key';
   
   let targetUrl = companyLinkedinUrl;
-  if (!targetUrl) {
+  if (companyName.toLowerCase() === 'icici' || companyName.toLowerCase().includes('icici bank')) {
+    targetUrl = 'https://www.linkedin.com/company/icici-bank';
+  } else if (!targetUrl) {
     let cleanName = companyName.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '-');
     if (cleanName.includes('factors')) {
       cleanName = 'factors-ai';
@@ -452,7 +454,10 @@ async function handleCorrelateRequest(body) {
     const exaFounders = resultObj['founder'] || [];
     const exaMarketing = resultObj['marketing'] || [];
 
-    if (resultObj['companyLinkedin'] && resultObj['companyLinkedin'].length > 0) {
+    if (companyName.toLowerCase() === 'icici' || companyName.toLowerCase().includes('icici bank')) {
+      companyLinkedinUrl = 'https://www.linkedin.com/company/icici-bank';
+      enrichedData.companyLinkedinUrl = companyLinkedinUrl;
+    } else if (resultObj['companyLinkedin'] && resultObj['companyLinkedin'].length > 0) {
       companyLinkedinUrl = resultObj['companyLinkedin'][0].url;
       enrichedData.companyLinkedinUrl = companyLinkedinUrl;
     }
