@@ -394,9 +394,29 @@ async function handleCorrelateRequest(body) {
     const promises = [];
     const keys = [];
 
-    const hasCachedContacts = enrichedData.resolvedContacts && enrichedData.resolvedContacts.length > 0;
+    let hasCachedContacts = enrichedData.resolvedContacts && enrichedData.resolvedContacts.length > 0;
     const hasCachedFounder = enrichedData.founderContact && enrichedData.founderContact.url && enrichedData.founderContact.name;
-    const hasCachedMarketing = enrichedData.marketingContact && enrichedData.marketingContact.url && enrichedData.marketingContact.name;
+    let hasCachedMarketing = enrichedData.marketingContact && enrichedData.marketingContact.url && enrichedData.marketingContact.name;
+
+    const isReRun = body.isReRun || false;
+    if (isReRun) {
+      console.log(`[Cache Bypass] Forced re-run requested. Bypassing cached contacts.`);
+      hasCachedContacts = false;
+      hasCachedMarketing = false;
+    } else if (hasCachedMarketing || hasCachedContacts) {
+      const cachedTitle = (enrichedData.marketingContact?.title || enrichedData.resolvedContacts?.[0]?.title || '').toLowerCase();
+      const isCachedHR = cachedTitle.includes('hr') || cachedTitle.includes('chro') || cachedTitle.includes('people') || cachedTitle.includes('talent') || cachedTitle.includes('learning');
+      const isCachedMarketing = cachedTitle.includes('marketing') || cachedTitle.includes('cmo') || cachedTitle.includes('brand') || cachedTitle.includes('growth') || cachedTitle.includes('sales');
+      
+      const requestedHR = targetDept === 'HR';
+      const requestedMarketing = targetDept === 'Marketing';
+      
+      if ((requestedHR && isCachedMarketing) || (requestedMarketing && isCachedHR)) {
+        console.log(`[Cache Bypass] Department mismatch: requested ${targetDept}, cached title is "${cachedTitle}". Bypassing cache.`);
+        hasCachedMarketing = false;
+        hasCachedContacts = false;
+      }
+    }
 
     if (!hasCachedContacts) {
       promises.push(searchExa(contactsQuery, 4, ['linkedin.com']));
@@ -673,7 +693,13 @@ async function handleCorrelateRequest(body) {
     } else if (exaMarketing && exaMarketing.length > 0) {
       const cleanMarketing = cleanExaResults(exaMarketing);
       const bestMarketing = cleanMarketing.find(r => isCurrentEmployee(r, companyName)) || cleanMarketing[0];
-      tempMarketingParsed = parseExaContact(bestMarketing, 'Head of Marketing');
+      
+      let defaultTitle = 'Head of Department';
+      if (targetDept === 'HR') defaultTitle = 'CHRO / L&D Head';
+      else if (targetDept === 'Marketing') defaultTitle = 'CMO / Marketing Lead';
+      else if (targetDept === 'Sales') defaultTitle = 'CRO / Sales Lead';
+      
+      tempMarketingParsed = parseExaContact(bestMarketing, defaultTitle);
       postPromises.push(getScrapeCreatorsPosts(tempMarketingParsed.url));
       postKeys.push({ type: 'marketing' });
     }

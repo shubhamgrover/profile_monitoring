@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { synthesizeCompanyAccount } from '../lib/synthesisEngine';
 import { MOCK_SIGNALS, MOCK_CREDITS, MOCK_PROFILES } from '../lib/mockData';
 import { supabase } from '../lib/supabaseClient';
@@ -947,6 +947,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   const [fetchingProfiles, setFetchingProfiles] = useState(false);
   const [profileActivity, setProfileActivity] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const isReRunRef = useRef(false);
   const [editingIndex, setEditingIndex] = useState(-1);
   const [editTitle, setEditTitle] = useState('');
   const [editNarrative, setEditNarrative] = useState('');
@@ -1136,7 +1137,8 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
             snapData: snapData, 
             targetDept, 
             targetSeniority,
-            gtmSettings
+            gtmSettings,
+            isReRun: isReRunRef.current
           }) 
         });
         if (res.ok && active) {
@@ -1227,7 +1229,10 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
           }
         }
       } catch (err) { console.error('[Correlate Effect Error]', err); }
-      finally { if (active) setLoadingAI(false); }
+      finally { 
+        if (active) setLoadingAI(false); 
+        isReRunRef.current = false;
+      }
     })();
     return () => { active = false; };
   }, [cacheKey, targetDept, targetSeniority, refreshTrigger]);
@@ -1318,6 +1323,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
                 return copy;
               });
             }
+            isReRunRef.current = true;
             setSynthesis(null);
             setRefreshTrigger(prev => prev + 1);
           }}
