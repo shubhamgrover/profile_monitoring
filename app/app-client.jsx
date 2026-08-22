@@ -67,12 +67,20 @@ export default function App() {
     }
 
     const userEmail = session?.user?.email;
-    if (userEmail && (userEmail.includes('premgrover22') || userEmail.includes('shubhamgrover.sg'))) {
+    if (userEmail) {
       try {
         let parsed = stored ? JSON.parse(stored) : {};
-        if (parsed.targetDept !== 'HR') {
+        const isHRUser = userEmail.includes('premgrover22') || userEmail.includes('neliyav928');
+        const isMarketingUser = userEmail.includes('shubhamgrover.sg');
+        
+        if (isHRUser && parsed.targetDept !== 'HR') {
           parsed.targetDept = 'HR';
           parsed.targetSeniority = 'CHRO';
+          localStorage.setItem(namespacedKey, JSON.stringify(parsed));
+          stored = JSON.stringify(parsed);
+        } else if (isMarketingUser && parsed.targetDept !== 'Marketing') {
+          parsed.targetDept = 'Marketing';
+          parsed.targetSeniority = 'VP';
           localStorage.setItem(namespacedKey, JSON.stringify(parsed));
           stored = JSON.stringify(parsed);
         }
