@@ -66,6 +66,21 @@ export default function App() {
       }
     }
 
+    const userEmail = session?.user?.email;
+    if (userEmail && (userEmail.includes('premgrover22') || userEmail.includes('shubhamgrover.sg'))) {
+      try {
+        let parsed = stored ? JSON.parse(stored) : {};
+        if (parsed.targetDept !== 'HR') {
+          parsed.targetDept = 'HR';
+          parsed.targetSeniority = 'CHRO';
+          localStorage.setItem(namespacedKey, JSON.stringify(parsed));
+          stored = JSON.stringify(parsed);
+        }
+      } catch (e) {
+        console.error('Forcing defaults error:', e);
+      }
+    }
+
     if (stored) {
       const parsed = JSON.parse(stored);
       setOnboardingSettings(parsed);
