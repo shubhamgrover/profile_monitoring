@@ -108,9 +108,16 @@ async function getCompanyPagePosts(companyName, companyLinkedinUrl) {
   if (companyName.toLowerCase() === 'icici' || companyName.toLowerCase().includes('icici bank')) {
     targetUrl = 'https://www.linkedin.com/company/icici-bank';
   } else if (!targetUrl) {
-    let cleanName = companyName.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '-');
+    // Split on common dividers like slashes or em-dashes to get the main brand name
+    let baseName = companyName.split(/\s*[\/|–—]\s*/)[0];
+    let cleanName = baseName.toLowerCase().replace(/\s+/g, '-').replace(/\./g, '-');
     if (cleanName.includes('factors')) {
       cleanName = 'factors-ai';
+    } else {
+      cleanName = cleanName
+        .replace(/^the-/, '')
+        .replace(/-(company|corp|corporation|inc|ltd|limited|pvt-ltd|group|plc)$/g, '')
+        .trim();
     }
     targetUrl = `https://www.linkedin.com/company/${cleanName}`;
   }
