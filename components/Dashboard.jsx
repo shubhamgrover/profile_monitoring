@@ -1295,7 +1295,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   if (snapData.cmsIntel) tabs.push({ id: 'cms', label: '\u{1F6E0}\uFE0F CMS' });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
       {/* header */}
       <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg-elevated)', flexShrink: 0 }}>
         <div style={{ width: 38, height: 38, borderRadius: 0, background: '#fff', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 3 }}>
@@ -1542,7 +1542,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
       </div>
 
       {/* tab content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
         {activeTab === 'correlations' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
