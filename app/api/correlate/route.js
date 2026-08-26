@@ -374,10 +374,9 @@ async function handleCorrelateRequest(body) {
     const seniorityQuery = seniorityMap[targetSeniority] || seniorityMap['All'];
     const departmentQuery = deptMap[targetDept] || deptMap['Marketing'];
 
-    const domainContext = domain ? ` (${domain})` : '';
-    
     // Check if the user is neliyav928@bocably.com to focus search targeting specifically on leaders based in India offices
     const isNeliyavUser = body.userEmail && body.userEmail.includes('neliyav928');
+    const domainContext = (domain && !isNeliyavUser) ? ` (${domain})` : '';
     const indiaFilter = isNeliyavUser ? " based in India offices" : "";
 
     let contactsQuery = `LinkedIn profile of a ${targetSeniority} in the ${targetDept} department at ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
