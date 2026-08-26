@@ -235,7 +235,7 @@ function SignalFeedRow({ signal, onDismiss, onOpenDetail }) {
 }
 
 // --- Main Dashboard ---
-export default function Dashboard({ signals: propSignals, profiles: propProfiles, credits, onNavigate, recentSignalIds, onDismiss, targetDept = 'Marketing', setTargetDept, targetSeniority = 'VP', setTargetSeniority, correlateCache = {}, setCorrelateCache, userId, onProfilesUpdated }) {
+export default function Dashboard({ signals: propSignals, profiles: propProfiles, credits, onNavigate, recentSignalIds, onDismiss, targetDept = 'Marketing', setTargetDept, targetSeniority = 'VP', setTargetSeniority, correlateCache = {}, setCorrelateCache, userId, userEmail, onProfilesUpdated }) {
   const [signals, setSignals]       = useState(propSignals || MOCK_SIGNALS);
   const profiles = propProfiles || MOCK_PROFILES;
   const [search, setSearch]         = useState('');
@@ -848,6 +848,7 @@ export default function Dashboard({ signals: propSignals, profiles: propProfiles
               correlateCache={correlateCache}
               setCorrelateCache={setCorrelateCache}
               userId={userId}
+              userEmail={userEmail}
               onProfilesUpdated={onProfilesUpdated}
             />
           </div>
@@ -913,7 +914,7 @@ function extractDateFromUrl(url) {
 }
 
 // --- Company Detail Drawer ---
-export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targetDept = 'Marketing', targetSeniority = 'VP', dynamicContacts = {}, correlateCache = {}, setCorrelateCache, userId, onProfilesUpdated }) {
+export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targetDept = 'Marketing', targetSeniority = 'VP', dynamicContacts = {}, correlateCache = {}, setCorrelateCache, userId, userEmail, onProfilesUpdated }) {
   const profile = profiles.find(p => (p.company || '').toLowerCase() === group.company.toLowerCase() || (p.name || '').toLowerCase() === group.company.toLowerCase());
   const snapData = (profile?.snapshots?.length > 0) ? profile.snapshots[profile.snapshots.length - 1] : (group.snapData || {});
 
@@ -1138,7 +1139,8 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
             targetDept, 
             targetSeniority,
             gtmSettings,
-            isReRun: isReRunRef.current
+            isReRun: isReRunRef.current,
+            userEmail: userEmail || profiles?.[0]?.user_email || userId
           }) 
         });
         if (res.ok && active) {

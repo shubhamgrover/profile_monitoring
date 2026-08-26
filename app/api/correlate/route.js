@@ -374,20 +374,25 @@ async function handleCorrelateRequest(body) {
     const departmentQuery = deptMap[targetDept] || deptMap['Marketing'];
 
     const domainContext = domain ? ` (${domain})` : '';
-    const contactsQuery = `LinkedIn profile of a ${targetSeniority} in the ${targetDept} department at ${companyName}${domainContext} site:linkedin.com/in/`;
-    const founderQuery = `LinkedIn profile of the CEO, Founder, or President of ${companyName}${domainContext} site:linkedin.com/in/`;
     
-    let marketingQuery = `LinkedIn profile of the CMO, VP of Marketing, or Head of Marketing at ${companyName}${domainContext} site:linkedin.com/in/`;
+    // Check if the user is neliyav928@bocably.com to focus search targeting specifically on leaders based in India offices
+    const isNeliyavUser = body.userEmail && body.userEmail.includes('neliyav928');
+    const indiaFilter = isNeliyavUser ? " based in India offices" : "";
+
+    let contactsQuery = `LinkedIn profile of a ${targetSeniority} in the ${targetDept} department at ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
+    let founderQuery = `LinkedIn profile of the CEO, Founder, or President of ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
+    
+    let marketingQuery = `LinkedIn profile of the CMO, VP of Marketing, or Head of Marketing at ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
     if (targetDept === 'HR') {
-      marketingQuery = `LinkedIn profile of the CHRO, Chief Learning Officer, Head of L&D, L&D Head, VP of HR, or Chief People Officer at ${companyName}${domainContext} site:linkedin.com/in/`;
+      marketingQuery = `LinkedIn profile of the CHRO, Chief Learning Officer, Head of L&D, L&D Head, VP of HR, or Chief People Officer at ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
     } else if (targetDept === 'Sales') {
-      marketingQuery = `LinkedIn profile of the CRO, VP of Sales, or Head of Sales at ${companyName}${domainContext} site:linkedin.com/in/`;
+      marketingQuery = `LinkedIn profile of the CRO, VP of Sales, or Head of Sales at ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
     } else if (targetDept === 'Engineering') {
-      marketingQuery = `LinkedIn profile of the CTO, VP of Engineering, or Head of Engineering at ${companyName}${domainContext} site:linkedin.com/in/`;
+      marketingQuery = `LinkedIn profile of the CTO, VP of Engineering, or Head of Engineering at ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
     } else if (targetDept === 'Product') {
-      marketingQuery = `LinkedIn profile of the CPO, VP of Product, or Head of Product at ${companyName}${domainContext} site:linkedin.com/in/`;
+      marketingQuery = `LinkedIn profile of the CPO, VP of Product, or Head of Product at ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
     } else if (targetDept === 'Operations') {
-      marketingQuery = `LinkedIn profile of the COO, VP of Operations, or Head of Operations at ${companyName}${domainContext} site:linkedin.com/in/`;
+      marketingQuery = `LinkedIn profile of the COO, VP of Operations, or Head of Operations at ${companyName}${domainContext}${indiaFilter} site:linkedin.com/in/`;
     }
 
     // 1. Concurrently resolve all Exa searches

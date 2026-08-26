@@ -506,6 +506,7 @@ export default function App() {
                 correlateCache={correlateCache}
                 setCorrelateCache={setCorrelateCache}
                 userId={session?.user?.id}
+                userEmail={session?.user?.email}
                 onProfilesUpdated={refreshData}
               />
             ) : (
