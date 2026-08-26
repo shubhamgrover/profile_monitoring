@@ -25,6 +25,7 @@ async function searchExa(query, limit = 2, includeDomains = null, startPublished
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(4500)
     });
     if (res.ok) {
       const data = await res.json();
@@ -920,7 +921,8 @@ Generate the deep correlations based on these 5 signal streams. Make sure that i
         generationConfig: {
           responseMimeType: 'application/json'
         }
-      })
+      }),
+      signal: AbortSignal.timeout(6500)
     });
 
     if (!response.ok) {
