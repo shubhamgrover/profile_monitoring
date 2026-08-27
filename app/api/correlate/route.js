@@ -942,6 +942,7 @@ Generate the deep correlations based on these 5 signal streams. Make sure that i
 
   } catch (error) {
     console.error('Error in /api/correlate route:', error.message);
+    const gtmSettings = body?.gtmSettings || {};
     const fallback = synthesizeCompanyAccount(companyName || 'Unknown', enrichedData || {}, targetDept, gtmSettings);
     const finalResponse = prepareCorrelateResponse(fallback, resolvedContacts || [], founderContact || null, marketingContact || null, companyPosts || [], true, companyName || 'Unknown', targetDept, enrichedData.jobOpenings || [], enrichedData.prMentions || [], enrichedData.redditMentions || [], enrichedData.twitterMentions || [], enrichedData.autoboundSignals || []);
     return { ...finalResponse, error: error.message };
