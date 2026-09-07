@@ -118,12 +118,24 @@ export default function App() {
 
   // Listen for Authentication state changes
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    const timer = setTimeout(() => {
       setLoadingSession(false);
-    });
+    }, 4000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(timer);
+        setSession(session);
+        setLoadingSession(false);
+      })
+      .catch(err => {
+        console.error("Auth session error:", err);
+        clearTimeout(timer);
+        setLoadingSession(false);
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      clearTimeout(timer);
       setSession(session);
       setLoadingSession(false);
       if (!session) {
@@ -131,7 +143,10 @@ export default function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const mapProfile = (p) => ({
