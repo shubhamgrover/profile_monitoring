@@ -758,9 +758,9 @@ async function handleCorrelateRequest(body) {
       return finalResponse;
     }
 
-    let hrSpecificInstructions = "";
+    let departmentSpecificInstructions = "";
     if (targetDept === 'HR') {
-      hrSpecificInstructions = `
+      departmentSpecificInstructions = `
 CRITICAL INSTRUCTIONS FOR AON LEARNING CENTER L&D TARGETING:
 We sell three corporate training academies at Aon to CHROs, Chief Learning Officers, L&D Heads, and business leaders:
 1. **Aon's HR Academy** (certified programs specifically to upskill the HR/L&D/Recruiting team themselves to handle organizational growth):
@@ -789,20 +789,39 @@ For every correlation:
 1. Ground the correlation in the target company's business pressure signals (e.g. general hiring, sales hiring, promotions/first-time managers, tech updates/CRM rollouts, M&As/restructuring).
 2. The narrative/reality [A] MUST explain the business pressure and predict the capability gap. Frame it as: "Since [X] tag/signal exists, it means [Y (implication)] and [Z (L&D need)], and generally you need specific training to have everyone up to speed."
 3. The outreach script [P] MUST pitch the specific name of an Aon Academy course or module (e.g. Aon's Sales Academy Module 2 for sales hiring, Aon's Leadership Academy Module 2 for team scaling/promotions, etc.) to get their team up to speed.
+`;
+    } else if (targetDept === 'Marketing') {
+      departmentSpecificInstructions = `
+CRITICAL INSTRUCTIONS FOR HT MEDIA SOLUTIONS TARGETING:
+We represent HT Media Solutions (Hindustan Times, Mint, Hindustan, HT One Audience, HT Impact Labs, and HT Marquee Events) pitching CMOs, Heads of Marketing, Brand Directors, Growth Heads, and Media Agency Leaders.
 
-Example structure for narrative/reality [A]:
-"Since we see a large sales hiring spree, it generally means revenue targets are increasing, which creates a critical L&D need to improve new rep productivity and standardize techniques. This means you need Aon's Sales Academy (Module 2: Sales Acumen & Techniques) to have the sales reps and hiring managers up to speed."
+We pitch 4 distinct core solutions based on the target account's signals:
 
-Example structure for outreach script [P]:
-"Which means this can be our pitch: 'I noticed your active sales team scaling. Since sales expansions exist, it generally means new reps need faster productivity. We help sales and HR leaders leverage Aon's Sales Academy (Module 2: Sales Acumen & Techniques) to upskill reps and get everyone up to speed. Worth a quick chat?'"
+1. **HT Marquee Events & Conclaves (CXO Access & Category Leadership)**:
+   - Flagship events: **HT Leadership Summit**, **Mint India Public Policy Summit**, **Mint Digital Innovation Summit**, **Mint BFSI Conclave**, **HT Brand Studio Live**.
+   - Trigger signals: Funding announcements, corporate scaleup, leadership hiring, major corporate pivots, category expansion.
+   - Value pitch: Position their brand alongside national thought leaders, enterprise CXOs, and policymakers with marquee stage & keynote sponsorships.
 
-Ensure that all generated outreach scripts [P] and email frameworks follow this pattern, matching the signals to the correct Aon Academies (HR, Sales, or Leadership).
+2. **HT Impact Labs & HT Brand Studio (Custom Storytelling & Content Partnerships)**:
+   - Trigger signals: New product launches, enterprise market entry, brand repositioning, customer story campaigns.
+   - Value pitch: Moving beyond commoditized banner ads to bespoke editorial storytelling, multimedia native articles, video series, and research whitepapers co-created with HT Impact Labs.
+
+3. **HT One Audience (1st-Party Deterministic Data & Precision Targeting)**:
+   - Trigger signals: High digital ad spend, performance marketing hiring, SEO/digital growth pushes, CAC optimization.
+   - Value pitch: Bypass generic 3rd-party programmatic ad networks with HT One's verified first-party audience intelligence (150M+ verified affluent Indian digital readers, C-suite executives, HNIs, and intent cohorts).
+
+4. **Print & Digital Newspaper Advertising (Mass Scale & Front-Page Authority)**:
+   - Key media brands: **Hindustan Times** (India's premier English daily), **Mint** (India's #1 premium business daily for CXOs/investors), and **Hindustan** (massive tier-2/tier-3 reach in Hindi heartland).
+   - Trigger signals: Nationwide marketing blitzes, festive campaigns, corporate trust building, mass brand credibility.
+   - Value pitch: High-impact front-page innovations, full-page brand credibility, and massive verified reach across India's most influential decision-makers.
+
+Ensure every generated correlation narrative [A], outreach script [P], and email framework pitches one of these HT Media pillars (HT Leadership Summit / Events, HT Impact Labs storytelling, HT One Audience first-party data, or Mint / Hindustan Times print & digital reach) aligned with their specific trigger signals!
 `;
     }
 
     const systemPrompt = `You are the world’s elite B2B Go-To-Market (GTM) strategist, corporate intelligence analyst, and master of Account-Based Marketing (ABM).
 
-${hrSpecificInstructions}
+${departmentSpecificInstructions}
 
 You are being handed a pre-compiled, multi-channel data payload for a target account. Your core capability is Multi-Signal Synthesis: you do not look at data points in isolation. Instead, you look for the "connective tissue" where an executive's personal point of view, a technical social media discussion, an API trigger, and job openings collide to reveal an unannounced corporate pivot, macro strategic shift, or massive operational bottleneck.
 
