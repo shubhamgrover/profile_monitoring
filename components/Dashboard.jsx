@@ -939,7 +939,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   const [synthesis, setSynthesis]         = useState(() => {
     const cached = correlateCache[cacheKey] || (snapData.synthesis && !isFallbackSynthesis(snapData.synthesis) && snapData.synthesis.strategicCorrelations?.length >= 2 ? snapData.synthesis : null);
     if (cached) return cached;
-    return synthesisEngine(group.company, group.signals, snapData, targetDept, targetSeniority);
+    return synthesizeCompanyAccount(group.company, snapData, targetDept);
   });
   const [loadingAI, setLoadingAI]         = useState(false);
   const [autoboundSignals, setAutoboundSignals] = useState(snapData.autoboundSignals || []);
@@ -1113,7 +1113,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
       setLoadingAI(false);
       return; // Skip API call
     } else {
-      const syn = synthesisEngine(group.company, group.signals, snapData, targetDept, targetSeniority);
+      const syn = synthesizeCompanyAccount(group.company, snapData, targetDept);
       setSynthesis(syn);
       setAutoboundSignals(snapData.autoboundSignals || []);
     }
