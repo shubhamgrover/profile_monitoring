@@ -1550,7 +1550,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
       </div>
 
       {/* tab content */}
-      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ padding: '12px 16px 80px 16px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
 
         {activeTab === 'correlations' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
