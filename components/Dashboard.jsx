@@ -937,7 +937,9 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   };
 
   const [synthesis, setSynthesis]         = useState(() => {
-    return correlateCache[cacheKey] || snapData.synthesis || group.synthesis || null;
+    const cached = correlateCache[cacheKey] || (snapData.synthesis && !isFallbackSynthesis(snapData.synthesis) && snapData.synthesis.strategicCorrelations?.length >= 2 ? snapData.synthesis : null);
+    if (cached) return cached;
+    return synthesisEngine(group.company, group.signals, snapData, targetDept, targetSeniority);
   });
   const [loadingAI, setLoadingAI]         = useState(false);
   const [autoboundSignals, setAutoboundSignals] = useState(snapData.autoboundSignals || []);
@@ -1062,7 +1064,7 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   // Sync synthesis and autoboundSignals state when profiles/snapData updates from the backend/polling save
   useEffect(() => {
     const freshSnap = (profile?.snapshots?.length > 0) ? profile.snapshots[profile.snapshots.length - 1] : null;
-    if (freshSnap?.synthesis) {
+    if (freshSnap?.synthesis && !isFallbackSynthesis(freshSnap.synthesis) && freshSnap.synthesis.strategicCorrelations?.length >= 2) {
       setSynthesis(freshSnap.synthesis);
       if (freshSnap.synthesis.recommendedFrameworkId) {
         setSelectedFrameworkId(freshSnap.synthesis.recommendedFrameworkId);
@@ -1102,14 +1104,17 @@ export function CompanyDetailDrawer({ group, profiles, onClose, onDismiss, targe
   const contactUrl = synthesis?.recommendedContact?.url || alternateContact?.url || primaryContact?.profileLinkedinUrl || primaryContact?.linkedinUrl || 'https://www.linkedin.com';
   useEffect(() => {
     const cached = correlateCache[cacheKey] || (refreshTrigger === 0 ? snapData.synthesis : null);
-    if (cached && cached.strategicCorrelations && cached.strategicCorrelations.length > 0) {
+    const hasValidNonFallback = cached && cached.strategicCorrelations && cached.strategicCorrelations.length >= 2 && !isFallbackSynthesis(cached);
+
+    if (hasValidNonFallback) {
       setSynthesis(cached);
       if (cached.recommendedFrameworkId) setSelectedFrameworkId(cached.recommendedFrameworkId);
       setAutoboundSignals(cached.autoboundSignals || snapData.autoboundSignals || []);
       setLoadingAI(false);
       return; // Skip API call
     } else {
-      setSynthesis(group.synthesis || null);
+      const syn = synthesisEngine(group.company, group.signals, snapData, targetDept, targetSeniority);
+      setSynthesis(syn);
       setAutoboundSignals(snapData.autoboundSignals || []);
     }
 
